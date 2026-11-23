@@ -451,22 +451,28 @@ function aggregateSheet(an, chainHint){
   const {map, body, monthCols, fileYear} = an;
   defaultSel(an);
   const passes = r => (!an.marcaSel || map.marca<0 || an.marcaSel.has(String(r[map.marca] ?? "").trim())) && (!an.tipoSel || map.tipo<0 || an.tipoSel.has(String(r[map.tipo] ?? "").trim()));
-  const stores = {}; let rows=0, skipped=0, total=0;
+  const stores = {}; let rows=0, skipped=0, total=0, excl=0;
+  const perMonth = {}, badDate = new Map();
+  let curRow = null;
   const add = (pdv, cad, ym, v) => {
-    if (v==null || !ym) { skipped++; return; }
+    if (v==null || !ym) { skipped++;
+      if (!ym && curRow){ const raw = [map.mes>=0?curRow[map.mes]:null, map.anio>=0?curRow[map.anio]:null, map.fecha>=0?curRow[map.fecha]:null].map(x => x instanceof Date ? x.toISOString().slice(0,10) : (x==null?"∅":String(x))).join(" | "); badDate.set(raw, (badDate.get(raw)||0)+1); }
+      return; }
+    const pm = (perMonth[ym] ||= {n:0, v:0}); pm.n++; pm.v += v;
     const k = norm(pdv); if (!k || /^TOTAL|SUBTOTAL|GRAN TOTAL/.test(k)) return;
     const s = (stores[k] ||= {p:String(pdv).trim(), c:inferChain(pdv, cad||chainHint), m:{}});
     s.m[ym] = Math.round(((s.m[ym]||0) + v)*100)/100; rows++; total += v;
   };
   if (map.pdv<0) return {stores, rows, skipped, total, error:"Falta la columna de punto de venta"};
   if (map.format==="ancho"){
-    for (const r of body){ const p = r[map.pdv]; if (p==null||p===""||!passes(r)) continue; const cad = map.cadena>=0 ? r[map.cadena] : "";
+    for (const r of body){ const p = r[map.pdv]; if (p==null||p==="") continue; if (!passes(r)){ excl++; continue; } const cad = map.cadena>=0 ? r[map.cadena] : "";
       for (const mc of monthCols) add(p, cad, mc.ym, num(r[mc.i])); }
   } else {
     if (map.venta<0) return {stores, rows, skipped, total, error:"Falta la columna de venta"};
     if (map.fecha<0 && map.mes<0) return {stores, rows, skipped, total, error:"Falta una columna de fecha o mes"};
     for (const r of body){
-      const p = r[map.pdv]; if (p==null||p===""||!passes(r)) continue;
+      const p = r[map.pdv]; if (p==null||p==="") continue; if (!passes(r)){ excl++; continue; }
+      curRow = r;
       let ym = null;
       if (map.anio>=0 && map.mes>=0){ const d = parseYM(r[map.mes]); const a = parseYM(r[map.anio]); const y = (a && a.y) || num(r[map.anio]); if (d && d.m && y) ym = ymKey(y, d.m); }
       if (!ym && map.fecha>=0){ const d = parseYM(r[map.fecha]); if (d && d.y && d.m) ym = ymKey(d.y, d.m); else if (d && d.m && map.anio<0 && fileYear) ym = ymKey(fileYear,d.m); }
@@ -474,7 +480,7 @@ function aggregateSheet(an, chainHint){
       add(p, map.cadena>=0 ? r[map.cadena] : "", ym, num(r[map.venta]));
     }
   }
-  return {stores, rows, skipped, total};
+  return {stores, rows, skipped, total, excl, perMonth, badDate};
 }
 
 async function handleVentasFiles(files){
@@ -518,7 +524,14 @@ function renderPending(){
       const yms = new Set(); Object.values(agg.stores).forEach(s=>Object.keys(s.m).forEach(k=>yms.add(k)));
       const ys = [...yms].sort();
       h += agg.error ? ` <span class="pill bad">${esc(agg.error)}</span>` : ` <span class="pill ok">${nS} PDV · ${ys.length? ymLabel(ys[0])+" a "+ymLabel(ys[ys.length-1]) : "sin meses"} · ${fmtS(agg.total)}</span>`;
-      if (agg.skipped) h += ` <span class="pill">${agg.skipped} filas sin fecha/valor</span>`;
+      if (agg.skipped) h += ` <span class="pill bad">${fmtN(agg.skipped)} filas sin mes o sin monto</span>`;
+      if (agg.excl) h += ` <span class="pill">${fmtN(agg.excl)} filas de otras marcas/tipos excluidas</span>`;
+      if (agg.perMonth && Object.keys(agg.perMonth).length){
+        h += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">` + Object.keys(agg.perMonth).sort().map(ym => `<span class="pill" title="${fmtN(agg.perMonth[ym].n)} filas">${ymLabel(ym)}: ${fmtS(agg.perMonth[ym].v)}</span>`).join("") + `</div>`;
+      }
+      if (agg.badDate && agg.badDate.size){
+        h += `<div class="msg err">Valores de MES | AÑO | FECHA que no se pudieron leer: ` + [...agg.badDate.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([v,c])=>`<b>${esc(v)}</b> (${fmtN(c)})`).join(", ") + `</div>`;
+      }
       h += `</div><div class="map">`;
       const m = sh.an.map;
       h += `<label>Formato<select data-f="${fi}" data-s="${si}" data-k="format"><option value="largo"${m.format==="largo"?" selected":""}>Largo (una fila por venta)</option><option value="ancho"${m.format==="ancho"?" selected":""}>Ancho (meses en columnas)</option></select></label>`;
