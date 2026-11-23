@@ -370,7 +370,7 @@ function readWorkbook(file){
           const first = text.split(/\r?\n/)[0]||"";
           const FS = (first.split(";").length > first.split(",").length) ? ";" : (first.includes("\t")?"\t":",");
           wb = XLSX.read(text, {type:"string", FS, raw:true});
-        } else wb = XLSX.read(fr.result, {type:"array", cellDates:true});
+        } else wb = XLSX.read(fr.result, {type:"array", cellDates:true, sheetRows:0});
         res(wb);
       }catch(e){ rej(e); }
     };
@@ -461,7 +461,7 @@ function aggregateSheet(an, chainHint){
   const inSel = (sel, col, r) => !sel || col<0 || map.format!=="largo" || sel.has(String(r[col] ?? "").trim());
   const passes = r => inSel(an.marcaSel, map.marca, r) && inSel(an.tipoSel, map.tipo, r) && inSel(an.cobSel, map.cobertura, r);
   const stores = {}; let rows=0, skipped=0, total=0, excl=0;
-  const perMonth = {}, badDate = new Map();
+  const perMonth = {}, badDate = new Map(), diag = {};
   let curRow = null;
   const add = (pdv, cad, ym, v) => {
     if (v==null || !ym) { skipped++;
@@ -480,16 +480,41 @@ function aggregateSheet(an, chainHint){
     if (map.venta<0) return {stores, rows, skipped, total, error:"Falta la columna de venta"};
     if (map.fecha<0 && map.mes<0) return {stores, rows, skipped, total, error:"Falta una columna de fecha o mes"};
     for (const r of body){
-      const p = r[map.pdv]; if (p==null||p==="") continue; if (!passes(r)){ excl++; continue; }
       curRow = r;
       let ym = null;
       if (map.anio>=0 && map.mes>=0){ const d = parseYM(r[map.mes]); const a = parseYM(r[map.anio]); const y = (a && a.y) || num(r[map.anio]); if (d && d.m && y) ym = ymKey(y, d.m); }
       if (!ym && map.fecha>=0){ const d = parseYM(r[map.fecha]); if (d && d.y && d.m) ym = ymKey(d.y, d.m); else if (d && d.m && map.anio<0 && fileYear) ym = ymKey(fileYear,d.m); }
       if (!ym && map.mes>=0){ const d = parseYM(r[map.mes]); let y = d && d.y; if (!y && map.anio>=0){ const a = parseYM(r[map.anio]); y = a && a.y || num(r[map.anio]); } if (!y) y = fileYear; if (d && d.m && y) ym = ymKey(y, d.m); }
-      add(p, map.cadena>=0 ? r[map.cadena] : "", ym, num(r[map.venta]));
+      const dg = (diag[ym || "?"] ||= {tot:0, noPdv:0, marca:0, cob:0, tipo:0, noVal:0, ok:0, v:0}); dg.tot++;
+      const p = r[map.pdv];
+      if (p==null || String(p).trim()===""){ dg.noPdv++; continue; }
+      if (!inSel(an.marcaSel, map.marca, r)){ dg.marca++; excl++; continue; }
+      if (!inSel(an.cobSel, map.cobertura, r)){ dg.cob++; excl++; continue; }
+      if (!inSel(an.tipoSel, map.tipo, r)){ dg.tipo++; excl++; continue; }
+      const v = num(r[map.venta]);
+      if (v==null){ dg.noVal++; }
+      else if (ym){ dg.ok++; dg.v += v; }
+      add(p, map.cadena>=0 ? r[map.cadena] : "", ym, v);
     }
   }
-  return {stores, rows, skipped, total, excl, perMonth, badDate};
+  return {stores, rows, skipped, total, excl, perMonth, badDate, diag, nBody: body.length};
+}
+
+// Algunos Excel (sobre todo .xlsb exportados por sistemas) declaran un rango menor al real;
+// se recalcula con las celdas que existen para no perder filas al final.
+function fixRange(ws){
+  if (!ws) return;
+  let maxR = -1, maxC = -1, minR = Infinity, minC = Infinity;
+  if (Array.isArray(ws["!data"])){
+    ws["!data"].forEach((row,r) => { if (!row) return; row.forEach((c,ci) => { if (c==null) return; if (r>maxR) maxR=r; if (r<minR) minR=r; if (ci>maxC) maxC=ci; if (ci<minC) minC=ci; }); });
+  } else {
+    for (const k in ws){ if (k[0]==="!") continue; const a = XLSX.utils.decode_cell(k); if (a.r>maxR) maxR=a.r; if (a.r<minR) minR=a.r; if (a.c>maxC) maxC=a.c; if (a.c<minC) minC=a.c; }
+  }
+  if (maxR<0) return;
+  const cur = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : null;
+  if (!cur || cur.e.r < maxR || cur.e.c < maxC || cur.s.r > minR || cur.s.c > minC){
+    ws["!ref"] = XLSX.utils.encode_range({s:{r:Math.min(minR, cur?cur.s.r:minR), c:Math.min(minC, cur?cur.s.c:minC)}, e:{r:Math.max(maxR, cur?cur.e.r:maxR), c:Math.max(maxC, cur?cur.e.c:maxC)}});
+  }
 }
 
 async function handleVentasFiles(files){
@@ -501,6 +526,7 @@ async function handleVentasFiles(files){
       const sheets = [];
       for (const sn of wb.SheetNames){
         const ws = wb.Sheets[sn];
+        fixRange(ws);
         const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, blankrows:false});
         const sy = (sn.match(/(20\d{2})/)||[])[1] || fy;
         const an = analyzeSheet(aoa, sy ? +sy : null);
@@ -537,6 +563,11 @@ function renderPending(){
       if (agg.excl) h += ` <span class="pill">${fmtN(agg.excl)} filas excluidas (marca, cobertura o tipo)</span>`;
       if (agg.perMonth && Object.keys(agg.perMonth).length){
         h += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">` + Object.keys(agg.perMonth).sort().map(ym => `<span class="pill" title="${fmtN(agg.perMonth[ym].n)} filas">${ymLabel(ym)}: ${fmtS(agg.perMonth[ym].v)}</span>`).join("") + `</div>`;
+      }
+      if (agg.diag && Object.keys(agg.diag).length){
+        const ks = Object.keys(agg.diag).sort();
+        h += `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600">Desglose por mes: filas leídas y por qué se descartan (${fmtN(agg.nBody)} filas en la hoja)</summary><div style="overflow:auto"><table class="chainsum" style="font-size:11px;margin-top:6px"><thead><tr><th>Mes</th><th>Filas</th><th>Sin PDV</th><th>Otra marca</th><th>No coberturado</th><th>Otro tipo</th><th>Sin monto</th><th>Sumadas</th><th>Monto</th></tr></thead><tbody>` +
+          ks.map(k => { const d = agg.diag[k]; return `<tr><td><b>${k==="?"?"Sin mes":ymLabel(k)}</b></td><td>${fmtN(d.tot)}</td><td>${fmtN(d.noPdv)}</td><td>${fmtN(d.marca)}</td><td>${fmtN(d.cob)}</td><td>${fmtN(d.tipo)}</td><td>${fmtN(d.noVal)}</td><td>${fmtN(d.ok)}</td><td>${fmtS(d.v)}</td></tr>`; }).join("") + `</tbody></table></div></details>`;
       }
       if (agg.badDate && agg.badDate.size){
         h += `<div class="msg err">Valores de MES | AÑO | FECHA que no se pudieron leer: ` + [...agg.badDate.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([v,c])=>`<b>${esc(v)}</b> (${fmtN(c)})`).join(", ") + `</div>`;
