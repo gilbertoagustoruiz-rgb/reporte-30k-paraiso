@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reporte 30K Paraíso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f4f2; --surface:#ffffff; --surface-2:#fafaf8; --line:#e4e3de; --line-2:#d2d1cb;
+  --ink:#141413; --ink-2:#52514e; --ink-3:#86857f;
+  --brand:#0f2a4a; --brand-ink:#ffffff; --accent:#2a78d6; --accent-soft:#e3eefb;
+  --warn-bg:#fdecc8; --warn-ink:#7a4a00; --warn:#eda100;
+  --crit:#d03b3b; --crit-bg:#fbe3e3; --crit-ink:#8f1f1f;
+  --good:#0a7d0a; --good-bg:#e2f3e2;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme:dark;
+    --bg:#121211; --surface:#1a1a19; --surface-2:#20201f; --line:#2e2e2c; --line-2:#3c3c39;
+    --ink:#f0efec; --ink-2:#c3c2b7; --ink-3:#8f8e87;
+    --brand:#0f2a4a; --accent:#3987e5; --accent-soft:#1c2d44;
+    --warn-bg:#4a3608; --warn-ink:#ffd98a; --warn:#fab219;
+    --crit-bg:#4a1d1d; --crit-ink:#ffb3b3; --good:#3fbf3f; --good-bg:#16321a;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit;color:inherit}
+.wrap{max-width:100%;padding:0 20px 40px}
+header.top{background:var(--brand);color:var(--brand-ink);padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header.top h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+header.top .sub{opacity:.75;font-size:12px}
+header.top .sp{flex:1}
+.btn{border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:default}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-top:16px}
+.card h2{margin:0 0 4px;font-size:14px;font-weight:600}
+.card .hint{color:var(--ink-2);margin:0 0 12px;font-size:12px}
+.drop{border:1.5px dashed var(--line-2);border-radius:var(--radius);padding:18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--surface-2);transition:.15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .ic{width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent);flex:none}
+.drop .tx{flex:1;min-width:220px}
+.drop .tx b{display:block;font-size:14px}
+.drop .tx span{color:var(--ink-2);font-size:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+.files{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.file{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:12px}
+.file .nm{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file .mt{color:var(--ink-2)}
+.preview{margin-top:12px;border:1px solid var(--accent);border-radius:var(--radius);padding:14px;background:var(--accent-soft)}
+.preview h3{margin:0 0 8px;font-size:13px}
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin:10px 0}
+.map label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--ink-2);font-weight:500}
+.map select{padding:5px 6px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface)}
+.sheetbox{border-top:1px solid var(--line-2);padding-top:10px;margin-top:10px}
+.sheetbox:first-of-type{border-top:0;margin-top:0;padding-top:0}
+.sheetbox .sh{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sheetbox .sh b{font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);font-weight:500}
+.pill.ok{background:var(--good-bg);border-color:transparent;color:var(--good)}
+.pill.bad{background:var(--crit-bg);border-color:transparent;color:var(--crit-ink)}
+.msg{font-size:12px;color:var(--ink-2);margin-top:8px}
+.msg.err{color:var(--crit-ink)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.kpi .l{font-size:11px;color:var(--ink-2);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.kpi .v{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--ink-3);margin-top:2px}
+.filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.filters label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--ink-2);font-weight:500}
+.filters input,.filters select{padding:6px 8px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface);min-width:120px}
+.filters input[type=search]{min-width:220px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line-2);border-radius:999px;padding:4px 10px;cursor:pointer;background:var(--surface);font-size:12px;user-select:none}
+.chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chainsum{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.chainsum th,.chainsum td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.chainsum th:first-child,.chainsum td:first-child{text-align:left}
+.chainsum th{font-size:11px;color:var(--ink-2);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.chainsum tr:hover td{background:var(--surface-2)}
+.meter{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.meter .bar{width:120px;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.meter .bar i{display:block;height:100%;background:var(--warn);border-radius:0 4px 4px 0}
+.tblwrap{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:auto;max-height:78vh}
+table.rep{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;font-size:12px;min-width:100%}
+table.rep th,table.rep td{padding:5px 8px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap}
+table.rep thead th{position:sticky;top:0;background:#141413;color:#fff;font-weight:600;font-size:11px;z-index:2;cursor:pointer;text-align:center}
+table.rep thead tr.g th{top:0;background:#2b2b29;font-size:10px;letter-spacing:.06em;cursor:default}
+table.rep thead tr.h th{top:25px}
+table.rep thead th.sorted::after{content:" ▾";opacity:.8}
+table.rep thead th.sorted.asc::after{content:" ▴"}
+table.rep td.n{text-align:right}
+table.rep td.c{text-align:center}
+table.rep td.z{color:var(--ink-3)}
+table.rep .st1{position:sticky;left:0;z-index:1;background:var(--surface);min-width:92px}
+table.rep .st2{position:sticky;left:92px;z-index:1;background:var(--surface);min-width:280px;box-shadow:2px 0 0 var(--line-2)}
+table.rep thead .st1,table.rep thead .st2{z-index:3;background:#141413}
+table.rep thead tr.g .st1,table.rep thead tr.g .st2{background:#2b2b29}
+table.rep tbody tr:hover td{background:var(--surface-2)}
+table.rep td.tot{font-weight:600;background:var(--surface-2)}
+table.rep td.low{background:var(--warn-bg)!important;color:var(--warn-ink);font-weight:700}
+table.rep td.br{color:var(--ink-2)}
+table.rep td.br.has{color:var(--ink);font-weight:600}
+table.rep td.br.par{background:var(--accent-soft)}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.tag.alert{background:var(--warn);color:#2b1c00}
+.tag.ok{background:var(--good-bg);color:var(--good)}
+.tag.na{background:var(--line);color:var(--ink-2)}
+.tag.nostr{background:var(--crit-bg);color:var(--crit-ink)}
+.empty{padding:40px;text-align:center;color:var(--ink-2)}
+.bar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.bar-actions .sp{flex:1}
+.note{font-size:12px;color:var(--ink-2)}
+details.unm{margin-top:10px}
+details.unm summary{cursor:pointer;font-size:12px;color:var(--ink-2)}
+details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;padding-left:18px}
+@media (max-width:700px){details.unm ul{columns:1}}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:9px 16px;border-radius:8px;font-size:12px;opacity:0;transition:.2s;pointer-events:none;z-index:50}
+.toast.show{opacity:1}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--surface);font-size:11px;padding:6px 8px;border-radius:6px;z-index:60;display:none;max-width:260px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>Reporte 30K Paraíso</h1>
+    <div class="sub" id="hdrSub">Estructura de promotoría 2026 · Ventas por punto de venta</div>
+  </div>
+  <div class="sp"></div>
+  <button class="btn ghost" id="btnUploadTop">⬆ Subir datos</button>
+</header>
+
+<div class="wrap">
+
+  <section class="card" id="uploadCard">
+    <h2>Datos del reporte</h2>
+    <p class="hint">Sube tus Excel (.xlsx, .xls) o CSV de venta anual. La página detecta las columnas de punto de venta, fecha o mes y venta; revisa el mapeo y agrégalo. Cada archivo se cruza con la estructura de promotoría por nombre de punto de venta.</p>
+    <div class="grid2">
+      <div>
+        <div class="drop" id="dropVentas">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+          <div class="tx"><b>Archivos de venta</b><span>Arrastra aquí uno o varios archivos, o elígelos.</span></div>
+          <label class="btn primary">Elegir archivos<input type="file" id="inVentas" accept=".xlsx,.xls,.xlsm,.csv,.txt" multiple hidden></label>
+        </div>
+        <div id="previewVentas"></div>
+        <div class="files" id="filesList"></div>
+      </div>
+      <div>
+        <div class="drop" id="dropEstr">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 11h5M18.5 8.5v5"/></svg></div>
+          <div class="tx"><b>Estructura de promotoría <span class="pill" id="estrSrc">Google Sheet · 335 PDV</span></b><span>Opcional: sube una versión nueva (hojas por cadena con PUNTOS DE VENTA, CARGO y columnas de marcas).</span></div>
+          <label class="btn">Reemplazar<input type="file" id="inEstr" accept=".xlsx,.xls,.csv" hidden></label>
+        </div>
+        <div class="msg" id="estrMsg"></div>
+        <details class="unm" id="unmatchedBox" hidden><summary id="unmatchedSum"></summary><ul id="unmatchedList"></ul></details>
+      </div>
+    </div>
+    <div class="msg" id="storeMsg"></div>
+  </section>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card" id="chainCard">
+    <h2 id="chainTitle">Resumen por cadena</h2>
+    <p class="hint" id="chainHint"></p>
+    <div style="overflow:auto"><table class="chainsum" id="chainTbl"></table></div>
+  </section>
+
+  <div class="filters">
+    <label>Cadena<div class="chips" id="chainChips"></div></label>
+  </div>
+  <div class="filters" style="margin-top:8px">
+    <label>Buscar punto de venta<input type="search" id="fSearch" placeholder="Ej. Plaza Vea Lima Ate"></label>
+    <label>Cargo<select id="fCargo"><option value="">Todos</option><option>Titular</option><option>Volante</option><option value="-">Sin estructura</option></select></label>
+    <label>Estado<select id="fEstado"><option value="">Todos</option><option value="low">Bajo umbral (&lt; 30K)</option><option value="alertprom">Alerta + promotoría</option><option value="ok">OK</option><option value="nosale">Sin venta en año ref.</option></select></label>
+    <label>Año de referencia<select id="fYear"></select></label>
+    <label>Umbral promedio (S/)<input type="number" id="fUmbral" value="30000" step="1000" min="0" style="min-width:110px"></label>
+    <label>Detalle mensual<select id="fDet"><option value="all">Todos los meses</option><option value="ref">Solo año ref.</option><option value="none">Solo totales</option></select></label>
+    <label>Marcas<select id="fBrands"><option value="all">Todas</option><option value="par">Solo Paraíso</option><option value="none">Ocultar</option></select></label>
+  </div>
+
+  <div class="bar-actions">
+    <span class="note" id="rowCount"></span>
+    <span class="sp"></span>
+    <button class="btn sm" id="btnCopy">Copiar tabla</button>
+    <button class="btn sm" id="btnXlsx" hidden>Descargar Excel</button>
+  </div>
+
+  <div class="tblwrap"><table class="rep" id="rep"></table></div>
+  <p class="note" style="margin-top:10px">Promedio = total del año ÷ meses con venta registrada. «&lt; a 30K»: el promedio del año de referencia está bajo el umbral. «Alertas + Promotoría»: además la tienda tiene promotor Paraíso asignado. Celdas en amarillo = promedio bajo el umbral.</p>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="tip" id="tip"></div>
+
+<script>
+const ESTRUCTURA_BASE = [{"c":"Plaza Vea","p":"PLAZA VEA CAJAMARCA CAJAMARCA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA JAEN JAEN","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":3.0}},{"c":"Plaza Vea","p":"PLAZA VEA PIURA PAITA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA TALARA TALARA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA TALARA TALARA REAL PLAZA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA PIURA PIURA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA SULLANA ECONOMAX SULLANA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA SULLANA SULLANA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA TUMBES TUMBES","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":3.0}},{"c":"Plaza Vea","p":"PLAZA VEA HUANUCO HUANUCO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA PUCALLPA PUCALLPA","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA TARAPOTO TARAPOTO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA ATE","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0,"DRIMER":2.0,"FORLI":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA CERES","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0,"DRIMER":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA PURUCHUCO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA SANTA CLARA","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":3.0,"DRIMER":2.0,"FORLI":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA BREÑA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA CALLAO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA COLONIAL","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA ALFONSO UGARTE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA GUARDIA CIVIL","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA CHOSICA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA COMAS","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0,"FORLI":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA PRO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA EL AGUSTINO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA IZAGUIRRE","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":3.0,"FORLI":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA BRASIL","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA SUCRE","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA JOCKEY PLAZA","g":"Volante","b":{"PARAISO":1.0,"DRIMER":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA MEXICO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA ALAMEDA SUR","g":"Titular","b":{"PARAISO":0.5}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA CENTRO CIVICO","g":"Volante","b":{"PARAISO":0.5}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA RISSO","g":"Titular","b":{"PARAISO":0.5}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA LOS OLIVOS","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA UNIVERSITARIA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0,"FORLI":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA LURIN","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA PUENTE PIEDRA","g":"Titular","b":{"PARAISO":2.0,"FORLI":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA ACHO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA ALCAZAR","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA PRIMAVERA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA SAN BORJA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA SAN JUAN DE LURIGANCHO","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0,"DRIMER":2.0,"FORLI":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA BOLICHERA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA HIGUERETA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA VENTANILLA","g":"Titular","b":{"PARAISO":1.0,"FORLI":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA PLACITA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA VILLA EL SALVADOR","g":"Volante","b":{"PARAISO":0.5}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA LA CURVA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA MALL AVENTURA SJL","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0,"DRIMER":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA CHACLACAYO","g":"Volante","b":{"PARAISO":0.5}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA AYACUCHO","g":"Volante","b":{"PARAISO":0.5}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA SAN ISIDRO","g":"Volante","b":{}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA PROCERES","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA CHICLAYO CHICLAYO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA CHICLAYO CHICLAYO MALL","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0,"FORLI":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA TRUJILLO TRUJILLO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0,"FORLI":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA TRUJILLO TRUJILLO CHACARERO","g":"Titular","b":{"PARAISO":2.0,"FORLI":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA CHIMBOTE CHIMBOTE","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA CHIMBOTE NUEVO CHIMBOTE","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA CUSCO CUSCO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA HUANCAYO HUANCAYO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA JULIACA JULIACA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA AREQUIPA AREQUIPA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA ILO ILO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA MOQUEGUA MOQUEGUA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA PUNO PUNO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA TACNA TACNA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA BARRANCA BARRANCA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA CHINCHA CHINCHA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA LIMA HUACHO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA HUARAL HUARAL","g":"Titular","b":{"PARAISO":1.0}},{"c":"Plaza Vea","p":"PLAZA VEA ICA ICA","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA PISCO PISCO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA TARAPOTO TARAPOTO 2","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Plaza Vea","p":"PLAZA VEA SAN JUAN BAUTISTA AYACUCHO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA PURUCHUCO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA BELLAVISTA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA SAENZ PEÑA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA CRILLON","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA HB DUEÑAS","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA NACIONES UNIDAS","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA HB GUARDIA CIVIL","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA HUAYLAS","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS LIMA COMAS","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS LIMA LA POLVORA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA HB HUAYCAN","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA MEGA PLAZA","g":"Titular","b":{"PARAISO":5.0,"EL CISNE":3.0,"FORLI":2.0}},{"c":"Tottus","p":"TOTTUS LIMA FONTANA","g":"Titular","b":{}},{"c":"Tottus","p":"TOTTUS LIMA LOS OLIVOS","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS LIMA HB PANAMERICANA URBANA","g":"Titular","b":{"PARAISO":0.25}},{"c":"Tottus","p":"TOTTUS LIMA HB PUENTE PIEDRA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA PUENTE PIEDRA","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0,"FORLI":2.0}},{"c":"Tottus","p":"TOTTUS LIMA SAN ISIDRO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA CAMPOY","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA SAN HILARION","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA TUSILAGOS","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA ATOCONGO","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS LIMA MALL DEL SUR","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA CANTA CALLAO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0,"FORLI":2.0}},{"c":"Tottus","p":"TOTTUS LIMA CANTA CENTRAL","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA DOMINICOS","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA HB TANTAMAYO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA QUILCA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS LIMA SAN MIGUEL","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA SANTA ANITA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0,"FORLI":1.0}},{"c":"Tottus","p":"TOTTUS LIMA JOCKEY PLAZA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA ANGAMOS","g":"Titular","b":{"PARAISO":2.0}},{"c":"Tottus","p":"TOTTUS LIMA PRECIO UNO VENTANILLA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA VILLA EL SALVADOR","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS LIMA PACHACUTEC","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA PUNTA HERMOSA","g":"Volante","b":{}},{"c":"Tottus","p":"TOTTUS LIMA HB COLLIQUE","g":"Titular","b":{"PARAISO":0.25,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS LIMA HB TUNGASUCA","g":"Volante","b":{"PARAISO":0.25}},{"c":"Tottus","p":"TOTTUS LIMA IZAGUIRRE","g":"Volante","b":{"PARAISO":0.25}},{"c":"Tottus","p":"TOTTUS CAJAMARCA OPEN PLAZA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS PIURA HB CHULUCANAS","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS PIURA CENTRO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS PIURA HB PIURA GRAU","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS SULLANA HB UNO SULLANA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS SULLANA SULLANA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS PIURA OPEN PLAZA","g":"Titular","b":{"PARAISO":4.0,"EL CISNE":3.0}},{"c":"Tottus","p":"TOTTUS HUANUCO HUANUCO","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS IQUITOS HB LA MARINA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS IQUITOS HB ALFONSO UGARTE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS MOYOBAMBA HB UNO MOYOBAMBA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS PUCALLPA HB PUCALLPA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS PUCALLPA PUCALLPA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS TARAPOTO HB TARAPOTO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS IQUITOS MALL AVENTURA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS CHICLAYO HB LEGUIA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.5}},{"c":"Tottus","p":"TOTTUS CHEPEN CHEPEN","g":"Titular","b":{"PARAISO":1.5,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS CHICLAYO HB BELAUNDE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS CHICLAYO OPEN CHICLAYO 1","g":"Titular","b":{"PARAISO":4.0,"EL CISNE":3.0,"FORLI":3.0}},{"c":"Tottus","p":"TOTTUS CHICLAYO SAN JOSE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS FERREÑAFE HB FERREÑAFE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS PACASMAYO TOTTUS PACASMAYO","g":"Titular","b":{"PARAISO":1.5,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS TRUJILLO HB PIEROLA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS TRUJILLO HB UNION","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS TRUJILLO JARDINES TRUJILLO","g":"Titular","b":{"PARAISO":2.5,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS TRUJILLO MANSICHE","g":"Titular","b":{"PARAISO":4.0,"EL CISNE":2.0,"FORLI":3.0}},{"c":"Tottus","p":"TOTTUS CHIMBOTE CHIMBOTE","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":3.0}},{"c":"Tottus","p":"TOTTUS CUSCO CUSCO (LA CULTURA)","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS HUANCAYO HUANCAYO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS CHANCHAMAYO HB LA MERCED","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS AREQUIPA PORONGOCHE","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS CAYMA CAYMA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS AREQUIPA PARRA AREQUIPA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS CHINCHA CHINCHA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS HUARAL HUARAL","g":"Titular","b":{"PARAISO":1.0}},{"c":"Tottus","p":"TOTTUS CAÑETE CAÑETE","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS ICA ICA","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0}},{"c":"Tottus","p":"TOTTUS HUACHO HB HUACHO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS HUACHO HUACHO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS ICA HB PANAMERICANA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS PISCO HB PISCO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS CHINCHA HB CHINCHA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Tottus","p":"TOTTUS ICA HB TINGUIÑA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO CAJAMARCA CC EL QUINDE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO PIURA PLAZA LA LUNA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO TUMBES TUMBES","g":"Titular","b":{"PARAISO":1.0}},{"c":"Metro","p":"METRO LIMA ENATA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA SANTA CLARA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"WONG LIMA ATE","g":"Titular","b":{"PARAISO":1.0}},{"c":"Metro","p":"METRO LIMA BREÑA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA MINKA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA COLONIAL","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA EMANCIPACION","g":"Titular","b":{"PARAISO":1.0}},{"c":"Metro","p":"METRO LIMA CHACLACAYO","g":"Titular","b":{}},{"c":"Metro","p":"METRO LIMA CHORRILLOS","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Metro","p":"METRO LIMA HUAYLAS","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA BELAUNDE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA PASCANA","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":3.0}},{"c":"Metro","p":"METRO LIMA IZAGUIRRE","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Metro","p":"METRO LIMA PLAZA NORTE","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":3.0}},{"c":"Metro","p":"WONG LIMA SOL DE LA MOLINA","g":"Titular","b":{"PARAISO":0.5}},{"c":"Metro","p":"METRO LIMA LA MOLINA","g":"Titular","b":{"PARAISO":0.5,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA CANADA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Metro","p":"METRO LIMA UNI","g":"Titular","b":{}},{"c":"Metro","p":"METRO LIMA LIMATAMBO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA PROCERES","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Metro","p":"METRO LIMA SAN JUAN DE LURIGANCHO","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0}},{"c":"Metro","p":"METRO LIMA ATOCONGO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO LIMA MIOTTA","g":"Titular","b":{"PARAISO":0.5}},{"c":"Metro","p":"METRO LIMA FAUCETT","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Metro","p":"METRO LIMA LA MARINA","g":"Titular","b":{"PARAISO":3.0,"EL CISNE":2.0}},{"c":"Metro","p":"METRO ANGELICA GAMARRA","g":"Titular","b":{"PARAISO":0.5}},{"c":"Metro","p":"METRO LIMA VENTANILLA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":2.0}},{"c":"Metro","p":"METRO CHICLAYO CHICLAYO BALTA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO CHICLAYO CHICLAYO GRAU","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO CHICLAYO CHICLAYO SANTA ELENA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO TRUJILLO TRUJILLO OVALO PAPAL","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO TRUJILLO TRUJILLO PENTA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Metro","p":"METRO CHIMBOTE CHIMBOTE","g":"Titular","b":{"PARAISO":1.0}},{"c":"Metro","p":"METRO AREQUIPA CERRO COLORADO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Metro","p":"METRO AREQUIPA HUNTER","g":"Titular","b":{}},{"c":"Metro","p":"METRO AREQUIPA LAMBRAMANI","g":"Titular","b":{"PARAISO":1.0}},{"c":"Metro","p":"METRO AREQUIPA PLAZA NORTE","g":"Titular","b":{"PARAISO":0.5}},{"c":"Metro","p":"METRO BARRANCA BARRANCA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":3.0}},{"c":"Metro","p":"METRO ICA CUTERVO ICA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Metro","p":"METRO ICA QUINDE ICA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Falabella","p":"FALABELLA CAJAMARCA C.C. EL QUINDE","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"FORLI":1.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA PIURA OPEN PLAZA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"FORLI":1.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA PIURA PIURA CENTRO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Falabella","p":"FALABELLA LIMA PURUCHUCO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA BELLAVISTA","g":"Titular","b":{"PARAISO":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA CENTRO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Falabella","p":"FALABELLA LIMA CENTRO CIVICO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0}},{"c":"Falabella","p":"FALABELLA LIMA COMAS","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA MEGA PLAZA","g":"Titular","b":{"PARAISO":2.0,"ROSEN":2.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA PLAZA NORTE","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA SALAVERRY","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA MIRAFLORES","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA SAN ISIDRO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA MALL DEL SUR","g":"Titular","b":{"PARAISO":2.0,"ROSEN":2.0,"DROM":2.0}},{"c":"Falabella","p":"FALABELLA LIMA SAN MIGUEL","g":"Titular","b":{"PARAISO":2.0,"ROSEN":2.0,"DRIMER":2.0,"DROM":2.0}},{"c":"Falabella","p":"FALABELLA LIMA SANTA ANITA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA LIMA JOCKEY PLAZA","g":"Titular","b":{"PARAISO":2.0,"ROSEN":3.0,"DRIMER":3.0,"DROM":2.0}},{"c":"Falabella","p":"FALABELLA LIMA ANGAMOS","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA IQUITOS MALL AVENTURA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Falabella","p":"FALABELLA CHICLAYO CHICLAYO REAL PLAZA","g":"Titular","b":{"PARAISO":3.0,"ROSEN":2.0,"FORLI":2.0,"DRIMER":2.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA TRUJILLO TRUJILLO MALL","g":"Titular","b":{"PARAISO":2.5,"ROSEN":2.0,"FORLI":1.5,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA CHIMBOTE CHIMBOTE","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.5,"FORLI":1.0,"DROM":0.5}},{"c":"Falabella","p":"FALABELLA CUSCO REAL PLAZA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"DRIMER":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA HUANCAYO HUANCAYO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"FORLI":1.0,"DROM":1.0}},{"c":"Falabella","p":"FALABELLA AREQUIPA PORONGOCHE","g":"Titular","b":{"PARAISO":2.0,"ROSEN":1.5,"FORLI":1.0,"DRIMER":1.0}},{"c":"Falabella","p":"FALABELLA CAYMA CAYMA","g":"Titular","b":{"PARAISO":3.0,"ROSEN":1.5,"FORLI":1.0,"DRIMER":1.0}},{"c":"Falabella","p":"FALABELLA ICA ICA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0}},{"c":"Ripley","p":"RIPLEY CAJAMARCA CAJAMARCA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"FORLI":1.0}},{"c":"Ripley","p":"RIPLEY PIURA REAL PLAZA","g":"Titular","b":{"PARAISO":2.0,"ROSEN":1.0,"FORLI":1.0,"RIZZOLI":1.0}},{"c":"Ripley","p":"RIPLEY PUCALLPA PUCALLPA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Ripley","p":"RIPLEY IQUITOS MALL AVENTURA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Ripley","p":"RIPLEY CHICLAYO CHICLAYO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"EL CISNE":1.0,"RIZZOLI":1.0}},{"c":"Ripley","p":"RIPLEY CHICLAYO CHICLAYO MALL","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0,"FORLI":1.0}},{"c":"Ripley","p":"RIPLEY TRUJILLO TRUJILLO","g":"Titular","b":{"PARAISO":2.5,"ROSEN":2.0,"FORLI":2.0,"RIZZOLI":1.0}},{"c":"Ripley","p":"RIPLEY CHIMBOTE CHIMBOTE","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.5}},{"c":"Ripley","p":"RIPLEY HUANCAYO HUANCAYO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"EL CISNE":1.0,"FORLI":1.0}},{"c":"Ripley","p":"RIPLEY LIMA PURUCHUCO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"FORLI":0.5,"RIZZOLI":0.5}},{"c":"Ripley","p":"RIPLEY LIMA BELLAVISTA","g":"Titular","b":{"PARAISO":1.0,"FORLI":1.0,"RIZZOLI":1.0}},{"c":"Ripley","p":"RIPLEY LIMA BREÑA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Ripley","p":"RIPLEY LIMA CHORRILLOS","g":"Titular","b":{"PARAISO":2.0,"ROSEN":1.0,"FORLI":1.0,"DRIMER":0.5,"RIZZOLI":1.0,"SERTA":0.5}},{"c":"Ripley","p":"RIPLEY LIMA COMAS","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"FORLI":0.5,"RIZZOLI":0.5}},{"c":"Ripley","p":"RIPLEY LIMA MEGA PLAZA","g":"Titular","b":{"PARAISO":2.0,"ROSEN":2.0,"FORLI":1.0,"RIZZOLI":1.0}},{"c":"Ripley","p":"RIPLEY LIMA SALAVERRY","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"DRIMER":0.5,"SERTA":0.5}},{"c":"Ripley","p":"RIPLEY LIMA MIRAFLORES","g":"Volante","b":{"PARAISO":1.0,"ROSEN":1.0,"FORLI":0.5,"DRIMER":0.5,"RIZZOLI":0.5,"SERTA":0.5}},{"c":"Ripley","p":"RIPLEY LIMA SAN BORJA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"FORLI":0.5,"DRIMER":0.5,"RIZZOLI":0.5,"SERTA":0.5}},{"c":"Ripley","p":"RIPLEY LIMA SAN ISIDRO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0}},{"c":"Ripley","p":"RIPLEY LIMA MALL DEL SUR","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"EL CISNE":1.0,"FORLI":0.5,"RIZZOLI":0.5}},{"c":"Ripley","p":"RIPLEY LIMA PLAZA NORTE","g":"Titular","b":{"PARAISO":2.0,"ROSEN":1.0,"FORLI":0.5,"DRIMER":0.5,"RIZZOLI":0.5,"SERTA":0.5}},{"c":"Ripley","p":"RIPLEY LIMA SAN MIGUEL","g":"Titular","b":{"PARAISO":2.0,"ROSEN":3.0,"FORLI":1.0,"DRIMER":1.0,"RIZZOLI":1.0,"SERTA":1.0}},{"c":"Ripley","p":"RIPLEY LIMA SANTA ANITA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"EL CISNE":1.0,"FORLI":0.5,"DRIMER":0.5,"RIZZOLI":0.5,"SERTA":0.5}},{"c":"Ripley","p":"RIPLEY LIMA JOCKEY PLAZA","g":"Titular","b":{"PARAISO":2.0,"ROSEN":2.0,"FORLI":1.0,"DRIMER":1.0,"RIZZOLI":1.0,"SERTA":1.0}},{"c":"Ripley","p":"RIPLEY LIMA PRIMAVERA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"FORLI":0.5,"RIZZOLI":0.5}},{"c":"Ripley","p":"RIPLEY LIMA MALL AVENTURA SJL","g":"Titular","b":{"PARAISO":2.0,"ROSEN":1.0,"FORLI":0.5,"DRIMER":0.5,"RIZZOLI":0.5,"SERTA":0.5}},{"c":"Ripley","p":"RIPLEY AREQUIPA AREQUIPA PORONGOCHE","g":"Titular","b":{"PARAISO":2.0,"ROSEN":2.0,"FORLI":1.0,"RIZZOLI":1.0}},{"c":"Ripley","p":"RIPLEY CAYMA CAYMA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"DRIMER":1.0}},{"c":"Ripley","p":"RIPLEY JULIACA JULIACA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Ripley","p":"RIPLEY ICA ICA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Oechsle","p":"OECHSLE CAJAMARCA CAJAMARCA","g":"Titular","b":{"PARAISO":2.0,"ROSEN":2.0,"EL CISNE":1.0,"DRIMER":1.0,"TECHNODREAM":1.0}},{"c":"Oechsle","p":"OECHSLE PIURA REAL PLAZA PIURA","g":"Titular","b":{"PARAISO":2.0,"ROSEN":1.0,"FORLI":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE HUANUCO HUANUCO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE PUCALLPA PUCALLPA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Oechsle","p":"OECHSLE CHICLAYO CHICLAYO","g":"Titular","b":{"PARAISO":2.0,"ROSEN":2.0,"FORLI":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE CHICLAYO CHICLAYO MALL","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Oechsle","p":"OECHSLE TRUJILLO TRUJILLO","g":"Titular","b":{"PARAISO":1.5,"ROSEN":2.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA CENTRO CIVICO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA PURUCHUCO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.5,"EL CISNE":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA JIRON DE LA UNION","g":"Titular","b":{"PARAISO":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA MEGA PLAZA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA PLAZA NORTE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA SALAVERRY","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.5,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA MALL DEL SUR","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.5,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA SAN BORJA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA JOCKEY PLAZA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA PRIMAVERA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA MALL AVENTURA SJL","g":"Titular","b":{"PARAISO":2.0,"ROSEN":1.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE LIMA MIRAFLORES","g":"Titular","b":{"PARAISO":1.0}},{"c":"Oechsle","p":"OECHSLE CUSCO CUSCO","g":"Titular","b":{"PARAISO":3.0,"ROSEN":2.0,"EL CISNE":1.0,"FORLI":2.0,"DRIMER":3.0}},{"c":"Oechsle","p":"OECHSLE HUANCAYO HUANCAYO","g":"Titular","b":{"PARAISO":1.0,"ROSEN":2.0,"EL CISNE":1.5,"DRIMER":1.5}},{"c":"Oechsle","p":"OECHSLE AREQUIPA AREQUIPA","g":"Titular","b":{"PARAISO":1.0,"ROSEN":1.0,"EL CISNE":1.0,"DRIMER":1.0}},{"c":"Oechsle","p":"OECHSLE JULIACA JULIACA","g":"Titular","b":{"PARAISO":2.0,"EL CISNE":1.0,"DRIMER":2.0}},{"c":"Oechsle","p":"OECHSLE BARRANCA BARRANCA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Oechsle","p":"OECHSLE ICA ICA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Estilos","p":"ESTILOS JAEN MEGA PLAZA","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Estilos","p":"ESTILOS TUMBES COSTA MAR","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Estilos","p":"ESTILOS TARAPOTO TARAPOTO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Estilos","p":"ESTILOS HUANCAYO HUANCAYO MALL","g":"Titular","b":{"PARAISO":1.0}},{"c":"Estilos","p":"ESTILOS AREQUIPA DECO-HOGAR","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Estilos","p":"ESTILOS AREQUIPA EJERCITO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Estilos","p":"ESTILOS AREQUIPA HOME","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.5}},{"c":"Estilos","p":"ESTILOS AREQUIPA LAMBRAMANI","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":0.5}},{"c":"Estilos","p":"ESTILOS AREQUIPA MALL PORONGOCHE","g":"Titular","b":{"PARAISO":1.0}},{"c":"Estilos","p":"ESTILOS AREQUIPA PORONGOCHE","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":1.0}},{"c":"Estilos","p":"ESTILOS HUACHO HUACHO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Estilos","p":"ESTILOS HUARAL HUARAL","g":"Titular","b":{"PARAISO":1.0}},{"c":"Estilos","p":"ESTILOS ICA ICA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Estilos","p":"ESTILOS PISCO PISCO","g":"Titular","b":{"PARAISO":1.0,"EL CISNE":2.0}},{"c":"Sodimac","p":"MAESTRO PIURA PIURA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"MAESTRO CAJAMARCA CAJAMARCA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC CAJAMARCA OPEN PLAZA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC SULLANA SULLANA","g":"Volante","b":{}},{"c":"Sodimac","p":"MAESTRO SULLANA SULLANA","g":"Volante","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"MAESTRO LIMA SURQUILLO","g":"Volante","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC LIMA SAN JUAN DE LURIGANCHO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC LIMA MEGA PLAZA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC LIMA SAN MIGUEL","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC LIMA COMAS TRAPICHE","g":"Volante","b":{"PARAISO":0.5}},{"c":"Sodimac","p":"MAESTRO LIMA NARANJAL","g":"Volante","b":{"PARAISO":0.5}},{"c":"Sodimac","p":"SODIMAC LIMA CANTA CALLAO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC LIMA ANGAMOS","g":"Volante","b":{"PARAISO":0.5}},{"c":"Sodimac","p":"SODIMAC LIMA PLAZA NORTE","g":"Volante","b":{"PARAISO":0.5}},{"c":"Sodimac","p":"SODIMAC LIMA ATOCONGO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC LIMA LA MOLINA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC LIMA COLONIAL","g":"Volante","b":{}},{"c":"Sodimac","p":"SODIMAC LIMA PUENTE PIEDRA","g":"Volante","b":{"PARAISO":0.5}},{"c":"Sodimac","p":"SODIMAC LIMA BELLAVISTA","g":"Volante","b":{"PARAISO":0.5}},{"c":"Sodimac","p":"SODIMAC PUCALLPA PUCALLPA","g":"Volante","b":{}},{"c":"Sodimac","p":"SODIMAC CUSCO CUSCO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"MAESTRO TACNA TACNA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC AREQUIPA CERRO COLORADO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"MAESTRO AREQUIPA LAMBRAMANI","g":"Titular","b":{"PARAISO":1.0}},{"c":"Sodimac","p":"SODIMAC AREQUIPA PORONGOCHE","g":"Volante","b":{"PARAISO":0.5}},{"c":"Sodimac","p":"SODIMAC LIMA JAVIER PRADO","g":"Volante","b":{"PARAISO":0.5}},{"c":"Conecta","p":"EFE SAN MARTIN TARAPOTO","g":"Titular","b":{"PARAISO":1.0}},{"c":"Conecta","p":"LA CURACAO ANCASH HUARAZ","g":"Titular","b":{"PARAISO":1.0}},{"c":"Conecta","p":"LA CURACAO APURIMAC ABANCAY","g":"Titular","b":{"PARAISO":1.0}},{"c":"Conecta","p":"LA CURACAO APURIMAC ANDAHUAYLAS","g":"Titular","b":{"PARAISO":1.0}},{"c":"Conecta","p":"LA CURACAO AREQUIPA CAMANA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Conecta","p":"LA CURACAO CAJAMARCA JAEN","g":"Titular","b":{}},{"c":"Conecta","p":"LA CURACAO HUANUCO TINGO MARIA","g":"Titular","b":{"PARAISO":0.5}},{"c":"Conecta","p":"LA CURACAO LORETO IQUITOS","g":"Titular","b":{"PARAISO":1.0}},{"c":"Conecta","p":"LA CURACAO SAN MARTIN MOYOBAMBA","g":"Titular","b":{"PARAISO":1.0}},{"c":"Conecta","p":"LA CURACAO SAN MARTIN TARAPOTO","g":"Titular","b":{}},{"c":"Conecta","p":"LA CURACAO SAN MARTIN TOCACHE","g":"Titular","b":{"PARAISO":1.0}},{"c":"Conecta","p":"EFE HUANUCO TINGO MARIA","g":"Volante","b":{"PARAISO":0.5}},{"c":"Hiraoka","p":"HIRAOKA LIMA INDEPENDENCIA","g":"Titular","b":{"PARAISO":1.0}}];
+const BRANDS = ["PARAISO","EL CISNE","FORLI","ROSEN","DRIMER","DROM","SIMONS","TECHNODREAM","RIZZOLI","SERTA"];
+const BRAND_LABEL = {"PARAISO":"Paraíso","EL CISNE":"El Cisne","FORLI":"Forli","ROSEN":"Rosen","DRIMER":"Drimer","DROM":"Drom","SIMONS":"Simmons","TECHNODREAM":"Technodream","RIZZOLI":"Rizzoli","SERTA":"Serta"};
+const CHAIN_ORDER = ["Conecta","Estilos","Falabella","Hiraoka","Metro","Oechsle","Plaza Vea","Ripley","Sodimac","Tottus"];
+const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const MONTHS = {ENE:1,ENERO:1,JAN:1,JANUARY:1,FEB:2,FEBRERO:2,FEBRUARY:2,MAR:3,MARZO:3,MARCH:3,ABR:4,ABRIL:4,APR:4,APRIL:4,MAY:5,MAYO:5,JUN:6,JUNIO:6,JUNE:6,JUL:7,JULIO:7,JULY:7,AGO:8,AGOSTO:8,AUG:8,AUGUST:8,SEP:9,SET:9,SETIEMBRE:9,SEPTIEMBRE:9,SEPT:9,SEPTEMBER:9,OCT:10,OCTUBRE:10,OCTOBER:10,NOV:11,NOVIEMBRE:11,NOVEMBER:11,DIC:12,DICIEMBRE:12,DEC:12,DECEMBER:12};
+
+/* ---------- utilidades ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function norm(s){return String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();}
+const fmt0 = new Intl.NumberFormat("es-PE",{maximumFractionDigits:0});
+const fmtN = v => v == null ? "" : fmt0.format(v);
+const fmtS = v => v == null ? "—" : "S/ " + fmt0.format(v);
+const ymLabel = ym => MES[+ym.slice(5,7)-1] + "-" + ym.slice(2,4);
+function toast(t){const e=$("toast");e.textContent=t;e.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>e.classList.remove("show"),2600);}
+function titleCase(s){return String(s).toLowerCase().replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase());}
+
+function num(v){
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  if (v instanceof Date) return null;
+  let s = String(v).replace(/S\/\.?|PEN|\s/gi,"");
+  if (!s) return null;
+  let neg = /^\(.*\)$/.test(s) || /^-/.test(s);
+  s = s.replace(/[()\-]/g,"");
+  const hasC = s.includes(","), hasD = s.includes(".");
+  if (hasC && hasD){ if (s.lastIndexOf(",") > s.lastIndexOf(".")) s = s.replace(/\./g,"").replace(",","."); else s = s.replace(/,/g,""); }
+  else if (hasC){ const p = s.split(","); s = (p.length===2 && p[1].length!==3) ? p.join(".") : p.join(""); }
+  else if (hasD){ const p = s.split("."); if (p.length>2) s = p.join(""); }
+  const n = parseFloat(s);
+  return isFinite(n) ? (neg?-n:n) : null;
+}
+function excelDate(n){ const d = new Date(Math.round((n - 25569) * 86400000)); return {y:d.getUTCFullYear(), m:d.getUTCMonth()+1}; }
+function parseYM(v){
+  if (v == null || v === "") return null;
+  if (v instanceof Date && !isNaN(v)) return {y:v.getFullYear(), m:v.getMonth()+1};
+  if (typeof v === "number"){
+    if (v>=1 && v<=12 && Number.isInteger(v)) return {m:v};
+    if (v>=190001 && v<=210012 && v%100>=1 && v%100<=12) return {y:Math.floor(v/100), m:v%100};
+    if (v>=1900 && v<=2100 && Number.isInteger(v)) return {y:v};
+    if (v>20000 && v<80000) return excelDate(v);
+    return null;
+  }
+  const s = norm(v); if (!s) return null;
+  let r;
+  if ((r = s.match(/^(\d{4}) (\d{1,2})(?: \d{1,2})?(?: \d.*)?$/)) && +r[2]>=1 && +r[2]<=12) return {y:+r[1], m:+r[2]};
+  if ((r = s.match(/^(\d{1,2}) (\d{1,2}) (\d{2,4})(?: .*)?$/))){ let y=+r[3]; if (y<100) y+=2000; if (+r[2]>=1&&+r[2]<=12) return {y, m:+r[2]}; }
+  if ((r = s.match(/^(\d{1,2}) (\d{4})$/)) && +r[1]>=1 && +r[1]<=12) return {y:+r[2], m:+r[1]};
+  if ((r = s.match(/^(\d{4})(\d{2})$/)) && +r[2]>=1 && +r[2]<=12) return {y:+r[1], m:+r[2]};
+  if ((r = s.match(/^(\d{1,2})$/)) && +r[1]>=1 && +r[1]<=12) return {m:+r[1]};
+  if ((r = s.match(/^(\d{4})$/))) return {y:+r[1]};
+  const tk = s.split(" "); let m=null, y=null;
+  for (const t of tk){
+    if (m==null && MONTHS[t]) m = MONTHS[t];
+    else if (m==null && t.length>=3 && MONTHS[t.slice(0,3)] && /^[A-Z]+$/.test(t)) m = MONTHS[t.slice(0,3)];
+    else if (/^\d{4}$/.test(t)) y = +t;
+    else if (/^\d{2}$/.test(t) && m!=null) y = 2000 + +t;
+  }
+  if (m) return y ? {y,m} : {m};
+  return null;
+}
+const ymKey = (y,m) => y + "-" + String(m).padStart(2,"0");
+
+/* ---------- inferencia de cadena ---------- */
+function inferChain(pdv, cadenaRaw){
+  const c = norm(cadenaRaw);
+  const tests = [[/PLAZA ?VEA|VEA/,"Plaza Vea"],[/TOTTUS/,"Tottus"],[/METRO|WONG|CENCOSUD/,"Metro"],[/FALABELLA|SAGA/,"Falabella"],[/RIPLEY/,"Ripley"],[/OECHSLE/,"Oechsle"],[/ESTILOS/,"Estilos"],[/SODIMAC|MAESTRO/,"Sodimac"],[/CONECTA|CURACAO|EFE/,"Conecta"],[/HIRAOKA/,"Hiraoka"]];
+  for (const [re,name] of tests) if (c && re.test(c)) return name;
+  const p = norm(pdv);
+  for (const [re,name] of tests) if (re.test(p.split(" ").slice(0,3).join(" "))) return name;
+  return cadenaRaw ? titleCase(cadenaRaw) : "Otras";
+}
+
+/* ---------- estado ---------- */
+let estructura = ESTRUCTURA_BASE.slice();
+let estrSource = "base";
+let fileData = {};          // id -> {name, uploadedAt, stores:{key:{p,c,m:{ym:v}}}}
+let pending = null;          // archivos en revisión
+let db = null, downloads = null;
+const ui = {chains:new Set(), sortKey:null, sortDir:-1};
+
+/* ---------- persistencia ---------- */
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||"null")}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function docId(name){return (name.replace(/[^A-Za-z0-9_\-.]/g,"_").slice(0,150) || "archivo");}
+
+async function persistFile(id){
+  const f = fileData[id];
+  // dividir por año para respetar el límite por documento
+  const byYear = {};
+  for (const [k,s] of Object.entries(f.stores)){
+    for (const [ym,v] of Object.entries(s.m)){
+      const y = ym.slice(0,4);
+      (byYear[y] ||= {})[k] ||= {p:s.p, c:s.c, m:{}};
+      byYear[y][k].m[ym] = v;
+    }
+  }
+  if (db){
+    try{
+      const prev = await db.collection("ventas").where("file","==",id).get();
+      const keep = new Set(Object.keys(byYear).map(y=>id+"__"+y));
+      for (const d of prev.docs) if (!keep.has(d.id)) await db.collection("ventas").doc(d.id).delete();
+      for (const [y,stores] of Object.entries(byYear)){
+        await db.collection("ventas").doc(id+"__"+y).set({file:id, name:f.name, uploadedAt:f.uploadedAt, year:y, stores});
+      }
+      return true;
+    }catch(e){ console.warn(e); toast("No se pudo guardar en la nube ("+(e.code||"error")+"); queda guardado en este navegador."); }
+  }
+  lsSet("r30k_files", fileData);
+  return false;
+}
+async function removeFile(id){
+  delete fileData[id];
+  if (db){
+    try{ const prev = await db.collection("ventas").where("file","==",id).get(); for (const d of prev.docs) await db.collection("ventas").doc(d.id).delete(); }
+    catch(e){ console.warn(e); }
+  }
+  lsSet("r30k_files", fileData);
+  renderAll();
+}
+async function persistEstr(){
+  const payload = {source:estrSource, rows:estructura};
+  if (db){ try{ if (estrSource==="base") await db.doc("config/estructura").delete(); else await db.doc("config/estructura").set(payload); return; }catch(e){console.warn(e);} }
+  lsSet("r30k_estr", estrSource==="base" ? null : payload);
+}
+async function loadPersisted(){
+  if (db){
+    try{
+      const snap = await db.collection("ventas").get();
+      const fd = {};
+      for (const d of snap.docs){
+        const x = d.data(); const id = x.file;
+        fd[id] ||= {name:x.name, uploadedAt:x.uploadedAt, stores:{}};
+        for (const [k,s] of Object.entries(x.stores||{})){
+          const t = (fd[id].stores[k] ||= {p:s.p, c:s.c, m:{}});
+          Object.assign(t.m, s.m);
+        }
+      }
+      fileData = fd;
+      const e = await db.doc("config/estructura").get();
+      if (e.exists){ const x = e.data(); estructura = x.rows; estrSource = x.source; }
+      return;
+    }catch(e){ console.warn(e); }
+  }
+  fileData = lsGet("r30k_files") || {};
+  const e = lsGet("r30k_estr"); if (e){ estructura = e.rows; estrSource = e.source; }
+}
+
+/* ---------- lectura de archivos ---------- */
+function readWorkbook(file){
+  return new Promise((res,rej)=>{
+    const fr = new FileReader();
+    fr.onload = () => {
+      try{
+        const isCsv = /\.(csv|txt)$/i.test(file.name);
+        let wb;
+        if (isCsv){
+          let text = new TextDecoder("utf-8").decode(new Uint8Array(fr.result));
+          if (text.includes(String.fromCharCode(65533))) text = new TextDecoder("windows-1252").decode(new Uint8Array(fr.result));
+          const first = text.split(/\r?\n/)[0]||"";
+          const FS = (first.split(";").length > first.split(",").length) ? ";" : (first.includes("\t")?"\t":",");
+          wb = XLSX.read(text, {type:"string", FS, raw:true});
+        } else wb = XLSX.read(fr.result, {type:"array", cellDates:true});
+        res(wb);
+      }catch(e){ rej(e); }
+    };
+    fr.onerror = () => rej(fr.error);
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+const RX = {
+  pdv:/PUNTOS? DE VENTA|^PDV\b|\bPDV$|TIENDA|^LOCAL|SUCURSAL|ESTABLECIMIENTO|PUNTO VENTA|NOMBRE PDV|DESCRIPCION LOCAL/,
+  cadena:/^CADENA|CLIENTE|^CANAL|RETAIL|CUENTA|BANNER|FORMATO/,
+  fecha:/FECHA|PERIODO|^DIA$|DATE/,
+  anio:/^ANO\b|^ANIO|^YEAR|EJERCICIO|^A O$/,
+  mes:/^MES\b|^MONTH|NOMBRE MES|^MES /,
+  venta:/VENTA|VALOR|MONTO|IMPORTE|SOLES|SELL ?OUT|NETO|INGRESO|TOTAL|^S$|PEN/,
+};
+const NOT_VENTA = /UNID|CANT|QTY|CODIGO|COD |^COD|SKU|PRECIO|COSTO|STOCK|META|CUOTA|DESC|EAN|ID\b|%|PORC|VAR /;
+
+function analyzeSheet(aoa, fileYear){
+  // encontrar fila de cabecera
+  let best = null;
+  const lim = Math.min(aoa.length, 30);
+  for (let r=0; r<lim; r++){
+    const row = aoa[r] || [];
+    const H = row.map(norm);
+    let score = 0, months = 0;
+    H.forEach((h,i)=>{ if (!h) return;
+      if (RX.pdv.test(h)) score+=3; if (RX.venta.test(h)) score+=1; if (RX.fecha.test(h)||RX.mes.test(h)||RX.anio.test(h)) score+=1; if (RX.cadena.test(h)) score+=1;
+      const ym = parseYM(row[i]); if (ym && ym.m && (ym.y || fileYear) && !RX.pdv.test(h)) months++; });
+    if (months>=3) score += 3;
+    if (score>=3 && (!best || score>best.score)) best = {r, score};
+  }
+  if (!best) return null;
+  const hr = best.r, headers = (aoa[hr]||[]).map(h => h instanceof Date ? h : (h ?? ""));
+  const H = headers.map(h => h instanceof Date ? "" : norm(h));
+  const body = aoa.slice(hr+1).filter(r => r && r.some(c => c!=null && c!==""));
+  const pick = (rx, excl) => { const i = H.findIndex(h => h && rx.test(h) && !(excl && excl.test(h))); return i<0 ? -1 : i; };
+  let pdv = H.findIndex(h => /PUNTOS? DE VENTA|PUNTO VENTA/.test(h)); if (pdv<0) pdv = pick(RX.pdv, /COD|ID\b|CODIGO/);
+  const cadena = pick(RX.cadena);
+  const fecha = pick(RX.fecha);
+  const anio = pick(RX.anio);
+  const mes = pick(RX.mes);
+  // columnas mensuales (formato ancho)
+  const monthCols = [];
+  headers.forEach((h,i)=>{ if (i===pdv || i===cadena) return; const ym = parseYM(h); if (ym && ym.m && (ym.y||fileYear) && !RX.venta.test(H[i]||"x") ) monthCols.push({i, ym:ymKey(ym.y||fileYear, ym.m)}); });
+  // columna de venta: preferir "VENTA", numérica
+  const numericShare = i => { let n=0,t=0; for (const r of body.slice(0,200)){ const v=r[i]; if (v==null||v==="") continue; t++; if (num(v)!=null && !(v instanceof Date)) n++; } return t? n/t : 0; };
+  let venta = -1, bestS = -1;
+  H.forEach((h,i)=>{ if (!h || i===pdv || i===anio || i===mes || i===fecha) return; if (!RX.venta.test(h) || NOT_VENTA.test(h)) return;
+    let s = numericShare(i); if (/VENTA/.test(h)) s += .5; if (/SOLES|S$|PEN|VALOR|IMPORTE|MONTO/.test(h)) s += .3; if (/TOTAL/.test(h) && !/VENTA/.test(h)) s -= .2;
+    if (s>bestS){bestS=s; venta=i;} });
+  const format = (monthCols.length>=3 && fecha<0 && mes<0) ? "ancho" : "largo";
+  return {hr, headers, H, body, map:{format, pdv, cadena, fecha, anio, mes, venta}, monthCols, fileYear};
+}
+
+function aggregateSheet(an, chainHint){
+  const {map, body, monthCols, fileYear} = an;
+  const stores = {}; let rows=0, skipped=0, total=0;
+  const add = (pdv, cad, ym, v) => {
+    if (v==null || !ym) { skipped++; return; }
+    const k = norm(pdv); if (!k || /^TOTAL|SUBTOTAL|GRAN TOTAL/.test(k)) return;
+    const s = (stores[k] ||= {p:String(pdv).trim(), c:inferChain(pdv, cad||chainHint), m:{}});
+    s.m[ym] = Math.round(((s.m[ym]||0) + v)*100)/100; rows++; total += v;
+  };
+  if (map.pdv<0) return {stores, rows, skipped, total, error:"Falta la columna de punto de venta"};
+  if (map.format==="ancho"){
+    for (const r of body){ const p = r[map.pdv]; if (p==null||p==="") continue; const cad = map.cadena>=0 ? r[map.cadena] : "";
+      for (const mc of monthCols) add(p, cad, mc.ym, num(r[mc.i])); }
+  } else {
+    if (map.venta<0) return {stores, rows, skipped, total, error:"Falta la columna de venta"};
+    if (map.fecha<0 && map.mes<0) return {stores, rows, skipped, total, error:"Falta una columna de fecha o mes"};
+    for (const r of body){
+      const p = r[map.pdv]; if (p==null||p==="") continue;
+      let ym = null;
+      if (map.fecha>=0){ const d = parseYM(r[map.fecha]); if (d && d.y && d.m) ym = ymKey(d.y, d.m); else if (d && d.m && map.anio<0 && fileYear) ym = ymKey(fileYear,d.m); }
+      if (!ym && map.mes>=0){ const d = parseYM(r[map.mes]); let y = d && d.y; if (!y && map.anio>=0){ const a = parseYM(r[map.anio]); y = a && a.y || num(r[map.anio]); } if (!y) y = fileYear; if (d && d.m && y) ym = ymKey(y, d.m); }
+      add(p, map.cadena>=0 ? r[map.cadena] : "", ym, num(r[map.venta]));
+    }
+  }
+  return {stores, rows, skipped, total};
+}
+
+async function handleVentasFiles(files){
+  const out = [];
+  for (const file of files){
+    try{
+      const wb = await readWorkbook(file);
+      const fy = (file.name.match(/(20\d{2})/)||[])[1];
+      const sheets = [];
+      for (const sn of wb.SheetNames){
+        const ws = wb.Sheets[sn];
+        const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, blankrows:false});
+        const sy = (sn.match(/(20\d{2})/)||[])[1] || fy;
+        const an = analyzeSheet(aoa, sy ? +sy : null);
+        sheets.push({name:sn, an, include: !!an && an.map.pdv>=0, chainHint: CHAIN_ORDER.find(c => norm(c)===norm(sn)) || ""});
+      }
+      out.push({file, sheets});
+    }catch(e){ console.error(e); out.push({file, error: "No se pudo leer: " + (e.message||e)}); }
+  }
+  pending = out; renderPending();
+}
+
+function optionList(an, sel, allowNone=true){
+  let h = allowNone ? `<option value="-1"${sel<0?" selected":""}>— ninguna —</option>` : "";
+  an.headers.forEach((x,i)=>{ const t = x instanceof Date ? ymLabel(ymKey(x.getFullYear(),x.getMonth()+1)) : String(x||"(col "+(i+1)+")"); h += `<option value="${i}"${i===sel?" selected":""}>${esc(t.slice(0,40))}</option>`; });
+  return h;
+}
+
+function renderPending(){
+  const box = $("previewVentas");
+  if (!pending || !pending.length){ box.innerHTML = ""; return; }
+  let h = `<div class="preview"><h3>Revisa el mapeo antes de agregar</h3>`;
+  pending.forEach((pf,fi)=>{
+    h += `<div style="margin-top:8px"><b>${esc(pf.file.name)}</b>`;
+    if (pf.error){ h += ` <span class="pill bad">${esc(pf.error)}</span></div>`; return; }
+    pf.sheets.forEach((sh,si)=>{
+      h += `<div class="sheetbox"><div class="sh"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-f="${fi}" data-s="${si}" data-k="include" ${sh.include?"checked":""} ${sh.an?"":"disabled"}> <b>Hoja: ${esc(sh.name)}</b></label>`;
+      if (!sh.an){ h += ` <span class="pill">sin datos reconocibles</span></div></div>`; return; }
+      const agg = aggregateSheet(sh.an, sh.chainHint); sh.agg = agg;
+      const nS = Object.keys(agg.stores).length;
+      const yms = new Set(); Object.values(agg.stores).forEach(s=>Object.keys(s.m).forEach(k=>yms.add(k)));
+      const ys = [...yms].sort();
+      h += agg.error ? ` <span class="pill bad">${esc(agg.error)}</span>` : ` <span class="pill ok">${nS} PDV · ${ys.length? ymLabel(ys[0])+" a "+ymLabel(ys[ys.length-1]) : "sin meses"} · ${fmtS(agg.total)}</span>`;
+      if (agg.skipped) h += ` <span class="pill">${agg.skipped} filas sin fecha/valor</span>`;
+      h += `</div><div class="map">`;
+      const m = sh.an.map;
+      h += `<label>Formato<select data-f="${fi}" data-s="${si}" data-k="format"><option value="largo"${m.format==="largo"?" selected":""}>Largo (una fila por venta)</option><option value="ancho"${m.format==="ancho"?" selected":""}>Ancho (meses en columnas)</option></select></label>`;
+      h += `<label>Punto de venta<select data-f="${fi}" data-s="${si}" data-k="pdv">${optionList(sh.an,m.pdv,false)}</select></label>`;
+      h += `<label>Cadena (opcional)<select data-f="${fi}" data-s="${si}" data-k="cadena">${optionList(sh.an,m.cadena)}</select></label>`;
+      if (m.format==="largo"){
+        h += `<label>Fecha<select data-f="${fi}" data-s="${si}" data-k="fecha">${optionList(sh.an,m.fecha)}</select></label>`;
+        h += `<label>Año<select data-f="${fi}" data-s="${si}" data-k="anio">${optionList(sh.an,m.anio)}</select></label>`;
+        h += `<label>Mes<select data-f="${fi}" data-s="${si}" data-k="mes">${optionList(sh.an,m.mes)}</select></label>`;
+        h += `<label>Venta (S/)<select data-f="${fi}" data-s="${si}" data-k="venta">${optionList(sh.an,m.venta)}</select></label>`;
+      } else {
+        h += `<label>Meses detectados<span class="pill">${sh.an.monthCols.length} columnas</span></label>`;
+      }
+      if (!sh.an.fileYear && m.format==="largo" && m.fecha<0 && m.anio<0) h += `<label>Año (si falta)<input type="number" data-f="${fi}" data-s="${si}" data-k="fy" placeholder="2026" style="padding:5px 6px;border:1px solid var(--line-2);border-radius:6px"></label>`;
+      h += `</div></div>`;
+    });
+    h += `</div>`;
+  });
+  h += `<div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="btnAdd">Agregar al reporte</button><button class="btn" id="btnCancel">Cancelar</button></div><div class="msg">Si un archivo con el mismo nombre ya estaba cargado, se reemplaza.</div></div>`;
+  box.innerHTML = h;
+  box.querySelectorAll("[data-k]").forEach(el => el.addEventListener("change", e => {
+    const pf = pending[+el.dataset.f], sh = pf.sheets[+el.dataset.s], k = el.dataset.k;
+    if (k==="include") sh.include = el.checked;
+    else if (k==="format") sh.an.map.format = el.value;
+    else if (k==="fy"){ sh.an.fileYear = +el.value || null; }
+    else sh.an.map[k] = +el.value;
+    renderPending();
+  }));
+  $("btnAdd").onclick = commitPending;
+  $("btnCancel").onclick = () => { pending = null; renderPending(); };
+}
+
+async function commitPending(){
+  const btn = $("btnAdd"); btn.disabled = true; btn.textContent = "Guardando…";
+  let added = 0;
+  for (const pf of pending){
+    if (pf.error) continue;
+    const stores = {};
+    for (const sh of pf.sheets){
+      if (!sh.include || !sh.agg || sh.agg.error) continue;
+      for (const [k,s] of Object.entries(sh.agg.stores)){
+        const t = (stores[k] ||= {p:s.p, c:s.c, m:{}});
+        for (const [ym,v] of Object.entries(s.m)) t.m[ym] = Math.round(((t.m[ym]||0)+v)*100)/100;
+      }
+    }
+    if (!Object.keys(stores).length) continue;
+    const id = docId(pf.file.name);
+    fileData[id] = {name:pf.file.name, uploadedAt:new Date().toISOString(), stores};
+    await persistFile(id); added++;
+  }
+  pending = null; renderPending(); renderAll();
+  toast(added ? `${added} archivo(s) agregados al reporte` : "No había datos válidos para agregar");
+}
+
+/* ---------- estructura ---------- */
+async function handleEstrFile(file){
+  try{
+    const wb = await readWorkbook(file);
+    const rows = [];
+    for (const sn of wb.SheetNames){
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, raw:true, defval:null, blankrows:false});
+      let hr = -1;
+      for (let r=0;r<Math.min(aoa.length,15);r++) if ((aoa[r]||[]).some(h => /PUNTOS? DE VENTA/.test(norm(h)))) { hr=r; break; }
+      if (hr<0) continue;
+      const H = aoa[hr].map(norm);
+      const iP = H.findIndex(h=>/PUNTOS? DE VENTA/.test(h)), iC = H.findIndex(h=>/^CADENA/.test(h)), iG = H.findIndex(h=>/^CARGO/.test(h));
+      const iPar = H.findIndex(h=>/^PARAISO$|^RECURSOS$/.test(h));
+      const bcols = {}; BRANDS.forEach(b => { if (b==="PARAISO") { if (iPar>=0) bcols[b]=iPar; return; } const i = H.findIndex(h => h===b || (b==="SIMONS" && h==="SIMMONS")); if (i>=0) bcols[b]=i; });
+      const sheetChain = CHAIN_ORDER.find(c => norm(c)===norm(sn));
+      for (const r of aoa.slice(hr+1)){
+        const p = r[iP]; if (!p) continue;
+        const b = {}; for (const [br,i] of Object.entries(bcols)){ const v = num(r[i]); if (v) b[br]=v; }
+        rows.push({c: sheetChain || inferChain(p, iC>=0 ? r[iC] : ""), p:String(p).trim(), g: iG>=0 && r[iG] ? titleCase(String(r[iG]).trim()) : "", b});
+      }
+    }
+    if (!rows.length){ $("estrMsg").innerHTML = `<span class="msg err">No encontré hojas con la columna «PUNTOS DE VENTA».</span>`; return; }
+    estructura = rows; estrSource = file.name;
+    await persistEstr(); renderAll();
+    toast(`Estructura reemplazada: ${rows.length} PDV`);
+  }catch(e){ $("estrMsg").innerHTML = `<span class="msg err">No se pudo leer el archivo: ${esc(e.message||e)}</span>`; }
+}
+
+/* ---------- modelo combinado ---------- */
+function buildModel(){
+  const map = new Map();
+  for (const e of estructura){
+    const k = norm(e.p);
+    if (!map.has(k)) map.set(k, {key:k, c:e.c, p:e.p, g:e.g||"", b:{...e.b}, inEstr:true, m:{}});
+  }
+  const unmatched = [];
+  const merged = {};
+  for (const f of Object.values(fileData)) for (const [k,s] of Object.entries(f.stores)){
+    const t = (merged[k] ||= {p:s.p, c:s.c, m:{}});
+    for (const [ym,v] of Object.entries(s.m)) t.m[ym] = (t.m[ym]||0) + v;
+  }
+  for (const [k,s] of Object.entries(merged)){
+    let row = map.get(k);
+    if (!row){ row = {key:k, c:s.c, p:titleCase(s.p), g:"", b:{}, inEstr:false, m:{}}; map.set(k,row); unmatched.push(s.p); }
+    for (const [ym,v] of Object.entries(s.m)) row.m[ym] = (row.m[ym]||0) + v;
+  }
+  const rows = [...map.values()];
+  const yms = new Set(); rows.forEach(r => Object.keys(r.m).forEach(k => yms.add(k)));
+  const months = [...yms].sort();
+  const years = [...new Set(months.map(m=>m.slice(0,4)))];
+  for (const r of rows){
+    r.y = {};
+    for (const y of years){
+      let t=0,n=0; for (const [ym,v] of Object.entries(r.m)) if (ym.startsWith(y)){ t+=v; if (v) n++; }
+      r.y[y] = {t: n? t : null, p: n? t/n : null, n};
+    }
+    r.par = r.b.PARAISO || 0;
+  }
+  const noSales = rows.filter(r => r.inEstr && !Object.keys(r.m).length).length;
+  return {rows, months, years, unmatched, noSales, hasSales: months.length>0};
+}
+
+function statusOf(r, refY, umbral){
+  const y = r.y[refY];
+  if (!y || y.p==null) return {low:null, alert:false};
+  const low = y.p < umbral;
+  return {low, alert: low && r.par > 0};
+}
+
+/* ---------- render ---------- */
+let MODEL = null;
+function renderAll(){
+  MODEL = buildModel();
+  // año de referencia
+  const fy = $("fYear"); const prev = fy.value;
+  fy.innerHTML = MODEL.years.length ? MODEL.years.slice().reverse().map(y=>`<option>${y}</option>`).join("") : `<option value="">—</option>`;
+  if (prev && MODEL.years.includes(prev)) fy.value = prev;
+  // cadenas
+  const chains = [...new Set(MODEL.rows.map(r=>r.c))].sort((a,b)=>{const ia=CHAIN_ORDER.indexOf(a), ib=CHAIN_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib) || a.localeCompare(b);});
+  $("chainChips").innerHTML = `<span class="chip ${ui.chains.size?"":"on"}" data-c="">Todas</span>` + chains.map(c=>`<span class="chip ${ui.chains.has(c)?"on":""}" data-c="${esc(c)}">${esc(c)}</span>`).join("");
+  $("chainChips").querySelectorAll(".chip").forEach(ch => ch.onclick = () => { const c = ch.dataset.c; if (!c) ui.chains.clear(); else ui.chains.has(c) ? ui.chains.delete(c) : ui.chains.add(c); renderAll(); });
+  // archivos
+  const fl = Object.entries(fileData);
+  $("filesList").innerHTML = fl.map(([id,f])=>{
+    const yms = new Set(); Object.values(f.stores).forEach(s=>Object.keys(s.m).forEach(k=>yms.add(k))); const ys=[...yms].sort();
+    const tot = Object.values(f.stores).reduce((a,s)=>a+Object.values(s.m).reduce((x,y)=>x+y,0),0);
+    return `<div class="file"><span>📄</span><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span><span class="mt">${Object.keys(f.stores).length} PDV · ${ys.length?ymLabel(ys[0])+"–"+ymLabel(ys[ys.length-1]):""} · ${fmtS(tot)}</span><button class="btn sm" data-del="${esc(id)}">Quitar</button></div>`;
+  }).join("");
+  $("filesList").querySelectorAll("[data-del]").forEach(b => b.onclick = () => removeFile(b.dataset.del));
+  // estructura
+  $("estrSrc").textContent = (estrSource==="base" ? "Google Sheet" : estrSource) + " · " + estructura.length + " PDV";
+  $("estrMsg").innerHTML = estrSource!=="base" ? `Usando estructura subida. <button class="btn sm" id="btnEstrReset">Volver a la del Google Sheet</button>` : "";
+  if ($("btnEstrReset")) $("btnEstrReset").onclick = async () => { estructura = ESTRUCTURA_BASE.slice(); estrSource="base"; await persistEstr(); renderAll(); };
+  // no cruzados
+  const u = MODEL.unmatched;
+  $("unmatchedBox").hidden = !u.length;
+  $("unmatchedSum").textContent = `${u.length} punto(s) de venta con venta que no están en la estructura (se muestran con «Sin estructura»)`;
+  $("unmatchedList").innerHTML = u.sort().map(x=>`<li>${esc(x)}</li>`).join("");
+  $("storeMsg").textContent = MODEL.hasSales ? `${MODEL.rows.length - u.length - MODEL.noSales} PDV cruzados con venta · ${MODEL.noSales} PDV de la estructura sin venta en los archivos.` : "";
+  $("hdrSub").textContent = MODEL.hasSales ? `Ventas ${ymLabel(MODEL.months[0])} a ${ymLabel(MODEL.months[MODEL.months.length-1])} · Estructura de promotoría 2026` : "Estructura de promotoría 2026 · Sube los archivos de venta para ver el reporte";
+  renderView();
+}
+
+function filteredRows(){
+  const q = norm($("fSearch").value), cargo = $("fCargo").value, est = $("fEstado").value;
+  const refY = $("fYear").value, umbral = +$("fUmbral").value || 0;
+  return MODEL.rows.filter(r => {
+    if (ui.chains.size && !ui.chains.has(r.c)) return false;
+    if (q && !r.key.includes(q)) return false;
+    if (cargo === "-" ? r.inEstr : (cargo && norm(r.g)!==norm(cargo))) return false;
+    if (est){
+      const s = statusOf(r, refY, umbral);
+      if (est==="low" && s.low!==true) return false;
+      if (est==="alertprom" && !s.alert) return false;
+      if (est==="ok" && s.low!==false) return false;
+      if (est==="nosale" && s.low!==null) return false;
+    }
+    return true;
+  });
+}
+
+function renderView(){
+  const refY = $("fYear").value, umbral = +$("fUmbral").value || 0;
+  const rows = filteredRows();
+  const uLbl = umbral>=1000 ? fmt0.format(umbral/1000)+"K" : fmt0.format(umbral);
+  document.querySelector('#fEstado option[value=low]').textContent = `Bajo umbral (< ${uLbl})`;
+  // KPIs
+  let low=0, alert=0, ventaRef=0, par=0, withSale=0;
+  rows.forEach(r=>{ const s = statusOf(r, refY, umbral); if (s.low) low++; if (s.alert) alert++; if (s.low!==null) withSale++; ventaRef += (r.y[refY]?.t||0); par += r.par; });
+  const kp = [
+    ["Puntos de venta", fmtN(rows.length), `${withSale} con venta en ${refY||"—"}`],
+    [`Venta ${refY||""}`, MODEL.hasSales? fmtS(ventaRef) : "—", MODEL.hasSales ? `${MODEL.months.filter(m=>m.startsWith(refY)).length} meses con datos` : "Sube archivos de venta"],
+    [`< a ${uLbl} (prom. ${refY||"—"})`, MODEL.hasSales? fmtN(low) : "—", withSale? `${Math.round(low/withSale*100)}% de las tiendas con venta` : ""],
+    ["Alertas + promotoría", MODEL.hasSales? fmtN(alert) : "—", "Bajo umbral y con promotor Paraíso"],
+    ["Promotores Paraíso", fmt0.format(Math.round(par*100)/100), "Suma de la estructura (incluye medios turnos)"],
+  ];
+  $("kpis").innerHTML = kp.map(k=>`<div class="kpi"><div class="l">${esc(k[0])}</div><div class="v">${k[1]}</div><div class="s">${esc(k[2])}</div></div>`).join("");
+  // resumen por cadena
+  const byC = {};
+  rows.forEach(r=>{ const c = (byC[r.c] ||= {n:0, ws:0, low:0, al:0, v:0, par:0}); c.n++; c.par+=r.par; const s = statusOf(r, refY, umbral); if (s.low!==null) c.ws++; if (s.low) c.low++; if (s.alert) c.al++; c.v += (r.y[refY]?.t||0); });
+  const cs = Object.entries(byC).sort((a,b)=>b[1].v-a[1].v);
+  $("chainTitle").textContent = `Resumen por cadena · ${refY||"sin ventas"}`;
+  $("chainHint").textContent = MODEL.hasSales ? `Tiendas con promedio mensual ${refY} bajo S/ ${fmt0.format(umbral)}.` : "Aún no hay ventas cargadas: se muestra solo la estructura.";
+  $("chainTbl").innerHTML = `<thead><tr><th>Cadena</th><th>PDV</th><th>Prom. Paraíso</th><th>Venta ${esc(refY||"")}</th><th>Con venta</th><th>&lt; ${uLbl}</th><th>% bajo umbral</th><th>Alerta + promotoría</th></tr></thead><tbody>` +
+    cs.map(([c,x])=>{ const pct = x.ws? x.low/x.ws : 0; return `<tr><td><b>${esc(c)}</b></td><td>${x.n}</td><td>${fmt0.format(Math.round(x.par*10)/10)}</td><td>${MODEL.hasSales?fmtS(x.v):"—"}</td><td>${MODEL.hasSales?x.ws:"—"}</td><td>${MODEL.hasSales?x.low:"—"}</td><td><div class="meter" data-tip="${esc(c)}: ${x.low} de ${x.ws} tiendas con venta (${Math.round(pct*100)}%)"><span>${MODEL.hasSales?Math.round(pct*100)+"%":"—"}</span><span class="bar"><i style="width:${pct*100}%"></i></span></div></td><td>${MODEL.hasSales?x.al:"—"}</td></tr>`; }).join("") + `</tbody>`;
+  // tabla principal
+  renderTable(rows, refY, umbral, uLbl);
+  $("rowCount").textContent = `${rows.length} filas`;
+}
+
+function columns(refY){
+  const det = $("fDet").value, bm = $("fBrands").value;
+  const cols = [];
+  cols.push({k:"c", label:"Cadena", grp:"", cls:"st1", get:r=>r.c, sort:r=>r.c});
+  cols.push({k:"p", label:"Punto de venta", grp:"", cls:"st2", get:r=>titleCase(r.p), sort:r=>r.p});
+  cols.push({k:"g", label:"Cargo", grp:"", get:r=>r.inEstr ? r.g : "", sort:r=>r.g});
+  const brands = bm==="none" ? [] : bm==="par" ? ["PARAISO"] : BRANDS;
+  brands.forEach(b => cols.push({k:"b_"+b, label:BRAND_LABEL[b], grp:"Promotores", brand:b, get:r=>r.b[b]||0, sort:r=>r.b[b]||0}));
+  for (const y of MODEL.years){
+    if (det==="all" || (det==="ref" && y===refY)) MODEL.months.filter(m=>m.startsWith(y)).forEach(ym => cols.push({k:"m_"+ym, label:ymLabel(ym), grp:"Venta "+y, num:true, get:r=>r.m[ym]??null, sort:r=>r.m[ym]??-1}));
+    cols.push({k:"t_"+y, label:"Total "+y, grp:"Venta "+y, num:true, tot:true, get:r=>r.y[y].t, sort:r=>r.y[y].t??-1});
+    cols.push({k:"p_"+y, label:"Promedio "+y, grp:"Venta "+y, num:true, tot:true, prom:y, get:r=>r.y[y].p, sort:r=>r.y[y].p??-1});
+  }
+  if (MODEL.hasSales){
+    cols.push({k:"ap", label:"Alertas + promotoría", grp:"Alertas", status:"ap", sort:r=>r._st.alert?1:0});
+    cols.push({k:"lo", label:"< a 30K", grp:"Alertas", status:"lo", sort:r=>r._st.low==null?-1:r._st.low?1:0});
+  }
+  return cols;
+}
+
+function renderTable(rows, refY, umbral, uLbl){
+  const t = $("rep");
+  if (!rows.length){ t.innerHTML = `<tbody><tr><td class="empty">No hay filas con estos filtros.</td></tr></tbody>`; return; }
+  rows.forEach(r => r._st = statusOf(r, refY, umbral));
+  const cols = columns(refY);
+  if (ui.sortKey){
+    const c = cols.find(c=>c.k===ui.sortKey);
+    if (c){ rows = rows.slice().sort((a,b)=>{ const x=c.sort(a), y=c.sort(b); return (typeof x==="string" ? x.localeCompare(y) : x-y) * ui.sortDir; }); }
+  } else {
+    rows = rows.slice().sort((a,b)=>{ const ia=CHAIN_ORDER.indexOf(a.c), ib=CHAIN_ORDER.indexOf(b.c); return (ia<0?99:ia)-(ib<0?99:ib) || a.p.localeCompare(b.p); });
+  }
+  // cabecera agrupada
+  let g = `<tr class="g">`, i = 0;
+  while (i<cols.length){ let j=i; while (j<cols.length && cols[j].grp===cols[i].grp) j++; const span=j-i;
+    if (!cols[i].grp){ for (let k=i;k<j;k++) g += `<th class="${cols[k].cls||""}"></th>`; }
+    else g += `<th colspan="${span}">${esc(cols[i].grp.toUpperCase())}</th>`;
+    i=j; }
+  g += `</tr>`;
+  let h = `<tr class="h">` + cols.map(c=>`<th data-k="${c.k}" class="${c.cls||""} ${ui.sortKey===c.k?"sorted"+(ui.sortDir>0?" asc":""):""}">${esc(c.k==="lo" ? "< a "+uLbl : c.label)}</th>`).join("") + `</tr>`;
+  let b = "";
+  for (const r of rows){
+    b += "<tr>";
+    for (const c of cols){
+      if (c.status){
+        if (r._st.low==null) b += `<td class="c"><span class="tag ${r.inEstr?"na":"nostr"}">${r.inEstr?"Sin venta":"Sin venta"}</span></td>`;
+        else if (c.status==="ap") b += `<td class="c">${r._st.alert?`<span class="tag alert">▲ ALERTA</span>`:`<span class="tag ok">✓ OK</span>`}</td>`;
+        else b += `<td class="c">${r._st.low?`<span class="tag alert">▲ Alerta</span>`:`<span class="tag ok">✓ OK</span>`}</td>`;
+        continue;
+      }
+      const v = c.get(r);
+      if (c.k==="g"){ b += `<td class="c">${r.inEstr ? esc(v) : `<span class="tag nostr">Sin estructura</span>`}</td>`; continue; }
+      if (c.brand){ b += `<td class="c br ${v?"has":""} ${c.brand==="PARAISO"?"par":""}">${v? (Number.isInteger(v)?v:v.toFixed(2).replace(/0$/,"")) : "0"}</td>`; continue; }
+      if (c.num){
+        const low = c.prom && v!=null && v < umbral;
+        b += `<td class="n ${c.tot?"tot":""} ${v==null?"z":""} ${low?"low":""}">${v==null?"–":fmtN(v)}</td>`; continue;
+      }
+      b += `<td class="${c.cls||""}">${esc(v)}</td>`;
+    }
+    b += "</tr>";
+  }
+  t.innerHTML = `<thead>${g}${h}</thead><tbody>${b}</tbody>`;
+  t.querySelectorAll("thead tr.h th").forEach(th => th.onclick = () => { const k = th.dataset.k; if (ui.sortKey===k) ui.sortDir = -ui.sortDir; else { ui.sortKey = k; ui.sortDir = (k==="c"||k==="p"||k==="g") ? 1 : -1; } renderView(); });
+  renderTable._last = {rows, cols, refY, umbral, uLbl};
+}
+
+/* ---------- exportar ---------- */
+function exportAoa(){
+  const L = renderTable._last; if (!L) return [];
+  const head = L.cols.map(c => c.k==="lo" ? "< a "+L.uLbl : (c.grp && !c.brand && !c.status ? c.label : c.label));
+  const out = [head];
+  for (const r of L.rows){
+    out.push(L.cols.map(c=>{
+      if (c.status){ if (r._st.low==null) return "Sin venta"; return c.status==="ap" ? (r._st.alert?"ALERTA":"OK") : (r._st.low?"Alerta":"OK"); }
+      if (c.k==="g") return r.inEstr ? r.g : "Sin estructura";
+      const v = c.get(r); return c.num && v!=null ? Math.round(v*100)/100 : v;
+    }));
+  }
+  return out;
+}
+
+/* ---------- eventos ---------- */
+function bindDrop(zone, input, handler, multi){
+  ["dragenter","dragover"].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove("over"); }));
+  zone.addEventListener("drop", e => { const fs = [...e.dataTransfer.files]; if (fs.length) handler(multi ? fs : fs[0]); });
+  input.addEventListener("change", () => { const fs = [...input.files]; if (fs.length) handler(multi ? fs : fs[0]); input.value = ""; });
+}
+bindDrop($("dropVentas"), $("inVentas"), handleVentasFiles, true);
+bindDrop($("dropEstr"), $("inEstr"), handleEstrFile, false);
+$("btnUploadTop").onclick = () => { $("uploadCard").scrollIntoView({behavior:"smooth"}); $("inVentas").click(); };
+let st; $("fSearch").addEventListener("input", () => { clearTimeout(st); st = setTimeout(renderView, 150); });
+["fCargo","fEstado","fYear","fUmbral","fDet","fBrands"].forEach(id => $(id).addEventListener("change", renderView));
+$("btnCopy").onclick = async () => {
+  const tsv = exportAoa().map(r => r.map(v => v==null ? "" : String(v)).join("\t")).join("\n");
+  try{ await navigator.clipboard.writeText(tsv); toast("Tabla copiada: pégala en Excel"); }catch(e){ toast("No se pudo copiar en esta vista"); }
+};
+$("btnXlsx").onclick = async () => {
+  try{
+    const ws = XLSX.utils.aoa_to_sheet(exportAoa());
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Reporte 30K");
+    const buf = XLSX.write(wb, {bookType:"xlsx", type:"array"});
+    const fname = `Reporte_30K_Paraiso_${$("fYear").value||""}.xlsx`;
+    if (downloads) await downloads.save({filename:fname, data:new Blob([buf])});
+    else { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); a.download = fname; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 1000); }
+  }catch(e){ if (e && e.code!=="declined") toast("No se pudo descargar ("+(e.code||e.message||"error")+")"); }
+};
+// tooltip
+document.addEventListener("mousemove", e => { const el = e.target.closest("[data-tip]"); const tp = $("tip"); if (!el){ tp.style.display="none"; return; } tp.textContent = el.dataset.tip; tp.style.display="block"; tp.style.left = Math.min(e.clientX+12, innerWidth-270)+"px"; tp.style.top = (e.clientY+14)+"px"; });
+
+/* ---------- arranque ---------- */
+renderAll();
+(async () => {
+  try{
+    if (window.claude && window.claude.use){
+      [db, downloads] = await Promise.all([window.claude.use("db").catch(()=>null), window.claude.use("downloads").catch(()=>null)]);
+    }
+  }catch(e){}
+  // fuera de claude.ai (p. ej. Render) la descarga directa del navegador funciona
+  if (downloads || !window.claude) $("btnXlsx").hidden = false;
+  await loadPersisted();
+  renderAll();
+})();
+</script>
+</body>
+</html>
