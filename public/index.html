@@ -429,7 +429,8 @@ function analyzeSheet(aoa, fileYear){
   const marca = H.findIndex(h => /^MARCA/.test(h));
   const tipo = H.findIndex(h => /^TIPO$|^TIPO /.test(h));
   const cobertura = H.findIndex(h => /^COBERTURA/.test(h));
-  return {hr, headers, H, body, map:{format, pdv, cadena, fecha, anio, mes, venta, marca, tipo, cobertura}, monthCols, fileYear};
+  const idt = H.findIndex(h => /^ID TIENDA|^COD(IGO)? (TIENDA|LOCAL|PDV)|^ID (LOCAL|PDV)/.test(h));
+  return {hr, headers, H, body, map:{format, pdv, cadena, fecha, anio, mes, venta, marca, tipo, cobertura, idt}, monthCols, fileYear};
 }
 
 function distinctValues(an, col){
@@ -486,7 +487,8 @@ function aggregateSheet(an, chainHint){
       if (!ym && map.fecha>=0){ const d = parseYM(r[map.fecha]); if (d && d.y && d.m) ym = ymKey(d.y, d.m); else if (d && d.m && map.anio<0 && fileYear) ym = ymKey(fileYear,d.m); }
       if (!ym && map.mes>=0){ const d = parseYM(r[map.mes]); let y = d && d.y; if (!y && map.anio>=0){ const a = parseYM(r[map.anio]); y = a && a.y || num(r[map.anio]); } if (!y) y = fileYear; if (d && d.m && y) ym = ymKey(y, d.m); }
       const dg = (diag[ym || "?"] ||= {tot:0, noPdv:0, marca:0, cob:0, tipo:0, noVal:0, ok:0, v:0}); dg.tot++;
-      const p = r[map.pdv];
+      let p = r[map.pdv];
+      if (an.fixPdv && an.pdvMap){ const fx = an.pdvMap.get(pdvKey(r, map)); if (fx) p = fx; }
       if (p==null || String(p).trim()===""){ dg.noPdv++; continue; }
       if (!inSel(an.marcaSel, map.marca, r)){ dg.marca++; excl++; continue; }
       if (!inSel(an.cobSel, map.cobertura, r)){ dg.cob++; excl++; continue; }
@@ -535,7 +537,28 @@ async function handleVentasFiles(files){
       out.push({file, sheets});
     }catch(e){ console.error(e); out.push({file, error: "No se pudo leer: " + (e.message||e)}); }
   }
+  detectPdvIssues(out);
   pending = out; renderPending();
+}
+
+/* Corrección de PDV: si en una hoja la columna PDV no corresponde a CADENA + ID TIENDA
+   (p. ej. una fórmula arrastrada que repite el mismo PDV en todas las filas), se toma el PDV
+   que esa tienda tiene en el resto de hojas/archivos cargados en la misma subida. */
+function pdvKey(r, map){ return norm(map.cadena>=0 ? r[map.cadena] : "") + "|" + norm(r[map.idt]); }
+function detectPdvIssues(out){
+  const counts = new Map();
+  const sheets = [];
+  for (const pf of out) for (const sh of (pf.sheets||[])){ const an = sh.an; if (!an || an.map.format!=="largo" || an.map.pdv<0 || an.map.idt<0) continue; sheets.push(sh);
+    for (const r of an.body){ const p = r[an.map.pdv], id = r[an.map.idt]; if (p==null || p==="" || id==null || id==="") continue; const k = pdvKey(r, an.map); let m = counts.get(k); if (!m){ m = new Map(); counts.set(k,m); } const pv = String(p).trim(); m.set(pv, (m.get(pv)||0)+1); } }
+  const best = new Map();
+  for (const [k,m] of counts){ let bp=null, bc=-1; for (const [p,c] of m) if (c>bc){ bc=c; bp=p; } best.set(k, bp); }
+  for (const sh of sheets){
+    const an = sh.an; let n=0, bad=0; const ids = new Set(), pdvs = new Set();
+    for (const r of an.body){ const p = r[an.map.pdv], id = r[an.map.idt]; if (p==null || p==="" || id==null || id==="") continue; n++; ids.add(norm(id)); pdvs.add(norm(p)); const b = best.get(pdvKey(r, an.map)); if (b && norm(b)!==norm(p)) bad++; }
+    an.pdvMap = best;
+    an.pdvIssue = n ? {rate: bad/n, bad, n, ids: ids.size, pdvs: pdvs.size} : null;
+    an.fixPdv = !!(an.pdvIssue && an.pdvIssue.rate > 0.2);
+  }
 }
 
 function optionList(an, sel, allowNone=true){
@@ -561,6 +584,10 @@ function renderPending(){
       h += agg.error ? ` <span class="pill bad">${esc(agg.error)}</span>` : ` <span class="pill ok">${nS} PDV · ${ys.length? ymLabel(ys[0])+" a "+ymLabel(ys[ys.length-1]) : "sin meses"} · ${fmtS(agg.total)}</span>`;
       if (agg.skipped) h += ` <span class="pill bad">${fmtN(agg.skipped)} filas sin mes o sin monto</span>`;
       if (agg.excl) h += ` <span class="pill">${fmtN(agg.excl)} filas excluidas (marca, cobertura o tipo)</span>`;
+      if (sh.an.pdvIssue && sh.an.pdvIssue.rate > 0.2){
+        const pi = sh.an.pdvIssue;
+        h += `<div class="msg err" style="margin-top:6px">⚠ En esta hoja la columna <b>${esc(String(sh.an.headers[sh.an.map.pdv]))}</b> no coincide con CADENA + ID TIENDA en ${Math.round(pi.rate*100)}% de las filas (${fmtN(pi.bad)} de ${fmtN(pi.n)}; ${pi.pdvs} PDV distintos para ${pi.ids} tiendas). <label style="display:inline-flex;gap:4px;align-items:center;color:var(--ink)"><input type="checkbox" data-f="${fi}" data-s="${si}" data-k="fixPdv" ${sh.an.fixPdv?"checked":""}> Corregir el PDV usando CADENA + ID TIENDA de las otras hojas</label></div>`;
+      }
       if (agg.perMonth && Object.keys(agg.perMonth).length){
         h += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">` + Object.keys(agg.perMonth).sort().map(ym => `<span class="pill" title="${fmtN(agg.perMonth[ym].n)} filas">${ymLabel(ym)}: ${fmtS(agg.perMonth[ym].v)}</span>`).join("") + `</div>`;
       }
@@ -610,8 +637,9 @@ function renderPending(){
     if (k==="include") sh.include = el.checked;
     else if (k==="format") sh.an.map.format = el.value;
     else if (k==="fy"){ sh.an.fileYear = +el.value || null; }
+    else if (k==="fixPdv"){ sh.an.fixPdv = el.checked; }
     else if (k==="selM" || k==="selT" || k==="selC"){ const vals = {selM:sh.an.marcaVals, selT:sh.an.tipoVals, selC:sh.an.cobVals}[k]; const set = {selM:sh.an.marcaSel, selT:sh.an.tipoSel, selC:sh.an.cobSel}[k]; const v = vals[+el.dataset.v][0]; el.checked ? set.add(v) : set.delete(v); }
-    else { sh.an.map[k] = +el.value; if (k==="marca") delete sh.an.marcaSel; if (k==="tipo") delete sh.an.tipoSel; if (k==="cobertura") delete sh.an.cobSel; }
+    else { sh.an.map[k] = +el.value; if (k==="pdv"||k==="cadena"||k==="idt") detectPdvIssues(pending); if (k==="marca") delete sh.an.marcaSel; if (k==="tipo") delete sh.an.tipoSel; if (k==="cobertura") delete sh.an.cobSel; }
     renderPending();
   }));
   $("btnAdd").onclick = commitPending;
