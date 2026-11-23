@@ -183,7 +183,7 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
   <div class="filters" style="margin-top:8px">
     <label>Buscar punto de venta<input type="search" id="fSearch" placeholder="Ej. Plaza Vea Lima Ate"></label>
     <label>Cargo<select id="fCargo"><option value="">Todos</option><option>Titular</option><option>Volante</option><option value="-">Sin estructura (descoberturadas)</option></select></label>
-    <label>Estado<select id="fEstado"><option value="">Todos</option><option value="low">Bajo umbral (&lt; 30K)</option><option value="alertprom">Alerta + promotoría</option><option value="ok">OK</option><option value="nosale">Sin venta en año ref.</option></select></label>
+    <label>Estado<select id="fEstado"><option value="">Todos</option><option value="low">Bajo umbral (&lt; 30K)</option><option value="alertprom">Alerta de promotoría</option><option value="ok">OK</option><option value="nosale">Sin venta en año ref.</option></select></label>
     <label>Año de referencia<select id="fYear"></select></label>
     <label>Umbral promedio (S/)<input type="number" id="fUmbral" value="30000" step="1000" min="0" style="min-width:110px"></label>
     <label>Detalle mensual<select id="fDet"><option value="all">Todos los meses</option><option value="ref">Solo año ref.</option><option value="none">Solo totales</option></select></label>
@@ -199,7 +199,7 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
   </div>
 
   <div class="tblwrap"><table class="rep" id="rep"></table></div>
-  <p class="note" style="margin-top:10px">Promedio = total del año ÷ meses con venta registrada. «&lt; a 30K»: el promedio del año de referencia está bajo el umbral. «Alertas + Promotoría»: además la tienda tiene promotor Paraíso asignado. Celdas en amarillo = promedio bajo el umbral.</p>
+  <p class="note" style="margin-top:10px">Promedio = total del año ÷ meses con venta registrada. «&lt; a 30K»: el promedio del año de referencia está bajo el umbral. «Alertas + Promotoría»: ALERTA si alguna marca de la competencia (El Cisne, Drimer, Forli, Rosen, Drom, Simmons, Technodream, Serta o Rizzoli) tiene más promotores que Paraíso en la tienda. Celdas en amarillo = promedio bajo el umbral.</p>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -730,11 +730,15 @@ function buildModel(){
   return {rows, months, years, unmatched, noSales, hasSales: months.length>0};
 }
 
+// Alerta de promotoría (fórmula del Excel): ALERTA si alguna marca de la competencia
+// tiene más promotores que Paraíso en la tienda; si no, OK. No depende de la venta.
+const COMPETENCIA = ["EL CISNE","DRIMER","FORLI","ROSEN","DROM","SIMONS","TECHNODREAM","SERTA","RIZZOLI"];
+function promAlert(r){ return r.inEstr && COMPETENCIA.some(b => (r.b[b]||0) > (r.b.PARAISO||0)); }
 function statusOf(r, refY, umbral){
+  const alert = promAlert(r);
   const y = r.y[refY];
-  if (!y || y.p==null) return {low:null, alert:false};
-  const low = y.p < umbral;
-  return {low, alert: low && r.par > 0};
+  if (!y || y.p==null) return {low:null, alert};
+  return {low: y.p < umbral, alert};
 }
 
 /* ---------- render ---------- */
@@ -802,7 +806,7 @@ function renderView(){
     ["Puntos de venta", fmtN(rows.length), `${withSale} con venta en ${refY||"—"}`],
     [`Venta ${refY||""}`, MODEL.hasSales? fmtS(ventaRef) : "—", MODEL.hasSales ? `${MODEL.months.filter(m=>m.startsWith(refY)).length} meses con datos` : "Sube archivos de venta"],
     [`< a ${uLbl} (prom. ${refY||"—"})`, MODEL.hasSales? fmtN(low) : "—", withSale? `${Math.round(low/withSale*100)}% de las tiendas con venta` : ""],
-    ["Alertas + promotoría", MODEL.hasSales? fmtN(alert) : "—", "Bajo umbral y con promotor Paraíso"],
+    ["Alertas + promotoría", fmtN(alert), "Competencia con más promotores que Paraíso"],
     ["Promotores Paraíso", fmt0.format(Math.round(par*100)/100), "Suma de la estructura (incluye medios turnos)"],
   ];
   $("kpis").innerHTML = kp.map(k=>`<div class="kpi"><div class="l">${esc(k[0])}</div><div class="v">${k[1]}</div><div class="s">${esc(k[2])}</div></div>`).join("");
@@ -813,7 +817,7 @@ function renderView(){
   $("chainTitle").textContent = `Resumen por cadena · ${refY||"sin ventas"}`;
   $("chainHint").textContent = MODEL.hasSales ? `Tiendas con promedio mensual ${refY} bajo S/ ${fmt0.format(umbral)}.` : "Aún no hay ventas cargadas: se muestra solo la estructura.";
   $("chainTbl").innerHTML = `<thead><tr><th>Cadena</th><th>PDV</th><th>Prom. Paraíso</th><th>Venta ${esc(refY||"")}</th><th>Con venta</th><th>&lt; ${uLbl}</th><th>% bajo umbral</th><th>Alerta + promotoría</th></tr></thead><tbody>` +
-    cs.map(([c,x])=>{ const pct = x.ws? x.low/x.ws : 0; return `<tr><td><b>${esc(c)}</b></td><td>${x.n}</td><td>${fmt0.format(Math.round(x.par*10)/10)}</td><td>${MODEL.hasSales?fmtS(x.v):"—"}</td><td>${MODEL.hasSales?x.ws:"—"}</td><td>${MODEL.hasSales?x.low:"—"}</td><td><div class="meter" data-tip="${esc(c)}: ${x.low} de ${x.ws} tiendas con venta (${Math.round(pct*100)}%)"><span>${MODEL.hasSales?Math.round(pct*100)+"%":"—"}</span><span class="bar"><i style="width:${pct*100}%"></i></span></div></td><td>${MODEL.hasSales?x.al:"—"}</td></tr>`; }).join("") + `</tbody>`;
+    cs.map(([c,x])=>{ const pct = x.ws? x.low/x.ws : 0; return `<tr><td><b>${esc(c)}</b></td><td>${x.n}</td><td>${fmt0.format(Math.round(x.par*10)/10)}</td><td>${MODEL.hasSales?fmtS(x.v):"—"}</td><td>${MODEL.hasSales?x.ws:"—"}</td><td>${MODEL.hasSales?x.low:"—"}</td><td><div class="meter" data-tip="${esc(c)}: ${x.low} de ${x.ws} tiendas con venta (${Math.round(pct*100)}%)"><span>${MODEL.hasSales?Math.round(pct*100)+"%":"—"}</span><span class="bar"><i style="width:${pct*100}%"></i></span></div></td><td>${x.al}</td></tr>`; }).join("") + `</tbody>`;
   // tabla principal
   renderTable(rows, refY, umbral, uLbl);
   $("rowCount").textContent = `${rows.length} filas`;
@@ -832,10 +836,8 @@ function columns(refY){
     cols.push({k:"t_"+y, label:"Total "+y, grp:"Venta "+y, num:true, tot:true, get:r=>r.y[y].t, sort:r=>r.y[y].t??-1});
     cols.push({k:"p_"+y, label:"Promedio "+y, grp:"Venta "+y, num:true, tot:true, prom:y, get:r=>r.y[y].p, sort:r=>r.y[y].p??-1});
   }
-  if (MODEL.hasSales){
-    cols.push({k:"ap", label:"Alertas + promotoría", grp:"Alertas", status:"ap", sort:r=>r._st.alert?1:0});
-    cols.push({k:"lo", label:"< a 30K", grp:"Alertas", status:"lo", sort:r=>r._st.low==null?-1:r._st.low?1:0});
-  }
+  cols.push({k:"ap", label:"Alertas + promotoría", grp:"Alertas", status:"ap", sort:r=>r._st.alert?1:0});
+  if (MODEL.hasSales) cols.push({k:"lo", label:"< a 30K", grp:"Alertas", status:"lo", sort:r=>r._st.low==null?-1:r._st.low?1:0});
   return cols;
 }
 
@@ -863,8 +865,8 @@ function renderTable(rows, refY, umbral, uLbl){
     b += "<tr>";
     for (const c of cols){
       if (c.status){
-        if (r._st.low==null) b += `<td class="c"><span class="tag ${r.inEstr?"na":"nostr"}">${r.inEstr?"Sin venta":"Sin venta"}</span></td>`;
-        else if (c.status==="ap") b += `<td class="c">${r._st.alert?`<span class="tag alert">▲ ALERTA</span>`:`<span class="tag ok">✓ OK</span>`}</td>`;
+        if (c.status==="ap"){ const tip = r.inEstr ? COMPETENCIA.filter(x => (r.b[x]||0) > (r.b.PARAISO||0)).map(x => BRAND_LABEL[x]+" "+r.b[x]).join(", ") : ""; b += `<td class="c" ${tip?`data-tip="Más promotores que Paraíso (${r.b.PARAISO||0}): ${esc(tip)}"`:""}>${!r.inEstr?`<span class="tag nostr">Sin estructura</span>`:r._st.alert?`<span class="tag alert">▲ ALERTA</span>`:`<span class="tag ok">✓ OK</span>`}</td>`; }
+        else if (r._st.low==null) b += `<td class="c"><span class="tag na">Sin venta</span></td>`;
         else b += `<td class="c">${r._st.low?`<span class="tag alert">▲ Alerta</span>`:`<span class="tag ok">✓ OK</span>`}</td>`;
         continue;
       }
@@ -891,7 +893,7 @@ function exportAoa(){
   const out = [head];
   for (const r of L.rows){
     out.push(L.cols.map(c=>{
-      if (c.status){ if (r._st.low==null) return "Sin venta"; return c.status==="ap" ? (r._st.alert?"ALERTA":"OK") : (r._st.low?"Alerta":"OK"); }
+      if (c.status){ if (c.status==="ap") return r.inEstr ? (r._st.alert?"ALERTA":"OK") : "Sin estructura"; if (r._st.low==null) return "Sin venta"; return r._st.low?"Alerta":"OK"; }
       if (c.k==="g") return r.inEstr ? r.g : "Sin estructura";
       const v = c.get(r); return c.num && v!=null ? Math.round(v*100)/100 : v;
     }));

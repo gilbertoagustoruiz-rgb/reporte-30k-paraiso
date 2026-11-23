@@ -19,5 +19,5 @@ Sitio estático en Render: publish path `public`, sin paso de compilación.
 
 ## Alertas
 - **< a 30K**: promedio mensual del año de referencia bajo el umbral (configurable).
-- **Alertas + Promotoría**: bajo el umbral y con promotor Paraíso asignado.
+- **Alertas + Promotoría**: ALERTA si alguna marca de la competencia (El Cisne, Drimer, Forli, Rosen, Drom, Simmons, Technodream, Serta o Rizzoli) tiene más promotores que Paraíso en la tienda; si no, OK.
 - Promedio = total del año ÷ meses con venta registrada.
