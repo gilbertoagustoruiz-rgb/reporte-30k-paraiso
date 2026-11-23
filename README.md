@@ -5,7 +5,7 @@ Dashboard web del reporte 30K de la cuenta Paraíso (Below Trade): venta mensual
 ## Uso
 1. Abre el sitio y pulsa **Subir datos**.
 2. Carga los Excel (.xlsx/.xls/.xlsb) o CSV de venta anual. La página detecta las columnas (PDV, AÑO/MES o FECHA, PRECIO TOTAL o VENTA, MARCA, TIPO) y permite ajustar el mapeo.
-   Por defecto solo suma las marcas Paraíso, Krea, Komfort, Viva Home y Casa Joven (columna MARCA) y solo las filas COBERTURADOS (columna COBERTURA); se puede cambiar en la revisión.
+   Por defecto solo suma las marcas Paraíso, Krea, Komfort, Viva Home y Casa Joven (columna MARCA) y solo las filas COBERTURADO o COBERTURADOS (columna COBERTURA); se puede cambiar en la revisión.
 3. Pulsa **Agregar al reporte**. Los datos se procesan en el navegador y quedan guardados en ese navegador (localStorage); no se envían a ningún servidor.
 
 ## Estructura del repositorio

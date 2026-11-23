@@ -565,7 +565,7 @@ function renderPending(){
         return x + `</div>`;
       };
       if (m.format==="largo" && m.marca>=0) h += vbox("Marcas incluidas (por defecto: Paraíso, Krea, Komfort, Viva Home, Casa Joven)", "selM", sh.an.marcaVals, sh.an.marcaSel);
-      if (m.format==="largo" && m.cobertura>=0) h += vbox("Cobertura incluida (por defecto: solo COBERTURADOS)", "selC", sh.an.cobVals, sh.an.cobSel);
+      if (m.format==="largo" && m.cobertura>=0) h += vbox("Cobertura incluida (por defecto: COBERTURADO y COBERTURADOS)", "selC", sh.an.cobVals, sh.an.cobSel);
       if (m.format==="largo" && m.tipo>=0 && sh.an.tipoVals.length>1) h += vbox("Tipo incluido", "selT", sh.an.tipoVals, sh.an.tipoSel);
       h += `</div>`;
     });
