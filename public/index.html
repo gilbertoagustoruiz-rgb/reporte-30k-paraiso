@@ -182,11 +182,12 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
   </div>
   <div class="filters" style="margin-top:8px">
     <label>Buscar punto de venta<input type="search" id="fSearch" placeholder="Ej. Plaza Vea Lima Ate"></label>
-    <label>Cargo<select id="fCargo"><option value="">Todos</option><option>Titular</option><option>Volante</option><option value="-">Sin estructura</option></select></label>
+    <label>Cargo<select id="fCargo"><option value="">Todos</option><option>Titular</option><option>Volante</option><option value="-">Sin estructura (descoberturadas)</option></select></label>
     <label>Estado<select id="fEstado"><option value="">Todos</option><option value="low">Bajo umbral (&lt; 30K)</option><option value="alertprom">Alerta + promotoría</option><option value="ok">OK</option><option value="nosale">Sin venta en año ref.</option></select></label>
     <label>Año de referencia<select id="fYear"></select></label>
     <label>Umbral promedio (S/)<input type="number" id="fUmbral" value="30000" step="1000" min="0" style="min-width:110px"></label>
     <label>Detalle mensual<select id="fDet"><option value="all">Todos los meses</option><option value="ref">Solo año ref.</option><option value="none">Solo totales</option></select></label>
+    <label style="flex-direction:row;align-items:center;gap:6px;align-self:center;margin-top:14px"><input type="checkbox" id="fNoEstr"> Incluir tiendas descoberturadas (sin estructura)</label>
     <label>Marcas<select id="fBrands"><option value="all">Todas</option><option value="par">Solo Paraíso</option><option value="none">Ocultar</option></select></label>
   </div>
 
@@ -704,7 +705,7 @@ function renderAll(){
   // no cruzados
   const u = MODEL.unmatched;
   $("unmatchedBox").hidden = !u.length;
-  $("unmatchedSum").textContent = `${u.length} punto(s) de venta con venta que no están en la estructura (se muestran con «Sin estructura»)`;
+  $("unmatchedSum").textContent = `${u.length} punto(s) de venta con venta que no están en la estructura: se tratan como descoberturados y se ocultan del reporte (actívalos con «Incluir tiendas descoberturadas»). Si alguno sí está coberturado, revisa que su nombre coincida con el de la estructura.`;
   $("unmatchedList").innerHTML = u.sort().map(x=>`<li>${esc(x)}</li>`).join("");
   $("storeMsg").textContent = MODEL.hasSales ? `${MODEL.rows.length - u.length - MODEL.noSales} PDV cruzados con venta · ${MODEL.noSales} PDV de la estructura sin venta en los archivos.` : "";
   $("hdrSub").textContent = MODEL.hasSales ? `Ventas ${ymLabel(MODEL.months[0])} a ${ymLabel(MODEL.months[MODEL.months.length-1])} · Estructura de promotoría 2026` : "Estructura de promotoría 2026 · Sube los archivos de venta para ver el reporte";
@@ -717,6 +718,7 @@ function filteredRows(){
   return MODEL.rows.filter(r => {
     if (ui.chains.size && !ui.chains.has(r.c)) return false;
     if (q && !r.key.includes(q)) return false;
+    if (!r.inEstr && !$("fNoEstr").checked && cargo !== "-") return false;
     if (cargo === "-" ? r.inEstr : (cargo && norm(r.g)!==norm(cargo))) return false;
     if (est){
       const s = statusOf(r, refY, umbral);
@@ -849,7 +851,7 @@ bindDrop($("dropVentas"), $("inVentas"), handleVentasFiles, true);
 bindDrop($("dropEstr"), $("inEstr"), handleEstrFile, false);
 $("btnUploadTop").onclick = () => { $("uploadCard").scrollIntoView({behavior:"smooth"}); $("inVentas").click(); };
 let st; $("fSearch").addEventListener("input", () => { clearTimeout(st); st = setTimeout(renderView, 150); });
-["fCargo","fEstado","fYear","fUmbral","fDet","fBrands"].forEach(id => $(id).addEventListener("change", renderView));
+["fCargo","fEstado","fYear","fUmbral","fDet","fBrands","fNoEstr"].forEach(id => $(id).addEventListener("change", renderView));
 $("btnCopy").onclick = async () => {
   const tsv = exportAoa().map(r => r.map(v => v==null ? "" : String(v)).join("\t")).join("\n");
   try{ await navigator.clipboard.writeText(tsv); toast("Tabla copiada: pégala en Excel"); }catch(e){ toast("No se pudo copiar en esta vista"); }
