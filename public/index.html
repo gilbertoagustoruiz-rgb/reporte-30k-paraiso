@@ -192,6 +192,7 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
     <label>Marcas<select id="fBrands"><option value="all">Todas</option><option value="par">Solo Paraíso</option><option value="none">Ocultar</option></select></label>
   </div>
 
+  <div class="msg err" id="compWarn" hidden style="margin-top:12px;padding:10px 12px;border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn-ink);border-radius:8px"></div>
   <div class="bar-actions">
     <span class="note" id="rowCount"></span>
     <span class="sp"></span>
@@ -826,6 +827,11 @@ function applySerie(){
 }
 function renderView(){
   const COMP = applySerie();
+  // aviso: archivos cargados sin venta de competencia (subidos antes de que existiera esta vista)
+  const sinComp = Object.values(fileData).filter(f => !Object.values(f.stores).some(s => s.mc && Object.keys(s.mc).length)).map(f => f.name);
+  const cw = $("compWarn");
+  if (COMP && sinComp.length){ cw.hidden = false; cw.innerHTML = `⚠ Estos archivos se cargaron sin venta de competencia y por eso salen vacíos: <b>${sinComp.map(esc).join(", ")}</b>. Quítalos en «Datos del reporte» y vuelve a subirlos para ver la competencia. Las cadenas sin otras marcas en el archivo (p. ej. Conecta) se verán vacías aunque los vuelvas a subir.`; }
+  else cw.hidden = true;
   const SER = COMP ? "competencia" : "Paraíso";
   const refY = $("fYear").value, umbral = +$("fUmbral").value || 0;
   const rows = filteredRows();
