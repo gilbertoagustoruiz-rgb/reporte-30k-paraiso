@@ -427,7 +427,8 @@ function analyzeSheet(aoa, fileYear){
   const format = (monthCols.length>=3 && fecha<0 && mes<0) ? "ancho" : "largo";
   const marca = H.findIndex(h => /^MARCA/.test(h));
   const tipo = H.findIndex(h => /^TIPO$|^TIPO /.test(h));
-  return {hr, headers, H, body, map:{format, pdv, cadena, fecha, anio, mes, venta, marca, tipo}, monthCols, fileYear};
+  const cobertura = H.findIndex(h => /^COBERTURA/.test(h));
+  return {hr, headers, H, body, map:{format, pdv, cadena, fecha, anio, mes, venta, marca, tipo, cobertura}, monthCols, fileYear};
 }
 
 function distinctValues(an, col){
@@ -441,6 +442,12 @@ function defaultSel(an){
     an.marcaVals = vals;
     an.marcaSel = an.map.marca>=0 ? new Set(vals.map(v=>v[0]).filter(v => MARCAS_DEFAULT.includes(norm(v)))) : null;
   }
+  if (an.cobSel === undefined){
+    const vals = distinctValues(an, an.map.cobertura);
+    an.cobVals = vals;
+    // solo filas «COBERTURADOS» (acepta COBERTURADO/A/S; excluye «NO COBERTURADO»)
+    an.cobSel = an.map.cobertura>=0 ? new Set(vals.map(v=>v[0]).filter(v => /^COBERTURAD/.test(norm(v)))) : null;
+  }
   if (an.tipoSel === undefined){
     const vals = distinctValues(an, an.map.tipo);
     an.tipoVals = vals;
@@ -450,7 +457,8 @@ function defaultSel(an){
 function aggregateSheet(an, chainHint){
   const {map, body, monthCols, fileYear} = an;
   defaultSel(an);
-  const passes = r => (!an.marcaSel || map.marca<0 || an.marcaSel.has(String(r[map.marca] ?? "").trim())) && (!an.tipoSel || map.tipo<0 || an.tipoSel.has(String(r[map.tipo] ?? "").trim()));
+  const inSel = (sel, col, r) => !sel || col<0 || map.format!=="largo" || sel.has(String(r[col] ?? "").trim());
+  const passes = r => inSel(an.marcaSel, map.marca, r) && inSel(an.tipoSel, map.tipo, r) && inSel(an.cobSel, map.cobertura, r);
   const stores = {}; let rows=0, skipped=0, total=0, excl=0;
   const perMonth = {}, badDate = new Map();
   let curRow = null;
@@ -525,7 +533,7 @@ function renderPending(){
       const ys = [...yms].sort();
       h += agg.error ? ` <span class="pill bad">${esc(agg.error)}</span>` : ` <span class="pill ok">${nS} PDV · ${ys.length? ymLabel(ys[0])+" a "+ymLabel(ys[ys.length-1]) : "sin meses"} · ${fmtS(agg.total)}</span>`;
       if (agg.skipped) h += ` <span class="pill bad">${fmtN(agg.skipped)} filas sin mes o sin monto</span>`;
-      if (agg.excl) h += ` <span class="pill">${fmtN(agg.excl)} filas de otras marcas/tipos excluidas</span>`;
+      if (agg.excl) h += ` <span class="pill">${fmtN(agg.excl)} filas excluidas (marca, cobertura o tipo)</span>`;
       if (agg.perMonth && Object.keys(agg.perMonth).length){
         h += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">` + Object.keys(agg.perMonth).sort().map(ym => `<span class="pill" title="${fmtN(agg.perMonth[ym].n)} filas">${ymLabel(ym)}: ${fmtS(agg.perMonth[ym].v)}</span>`).join("") + `</div>`;
       }
@@ -544,6 +552,7 @@ function renderPending(){
         h += `<label>Venta (S/)<select data-f="${fi}" data-s="${si}" data-k="venta">${optionList(sh.an,m.venta)}</select></label>`;
         h += `<label>Marca<select data-f="${fi}" data-s="${si}" data-k="marca">${optionList(sh.an,m.marca)}</select></label>`;
         h += `<label>Tipo<select data-f="${fi}" data-s="${si}" data-k="tipo">${optionList(sh.an,m.tipo)}</select></label>`;
+        h += `<label>Cobertura<select data-f="${fi}" data-s="${si}" data-k="cobertura">${optionList(sh.an,m.cobertura)}</select></label>`;
       } else {
         h += `<label>Meses detectados<span class="pill">${sh.an.monthCols.length} columnas</span></label>`;
       }
@@ -556,6 +565,7 @@ function renderPending(){
         return x + `</div>`;
       };
       if (m.format==="largo" && m.marca>=0) h += vbox("Marcas incluidas (por defecto: Paraíso, Krea, Komfort, Viva Home, Casa Joven)", "selM", sh.an.marcaVals, sh.an.marcaSel);
+      if (m.format==="largo" && m.cobertura>=0) h += vbox("Cobertura incluida (por defecto: solo COBERTURADOS)", "selC", sh.an.cobVals, sh.an.cobSel);
       if (m.format==="largo" && m.tipo>=0 && sh.an.tipoVals.length>1) h += vbox("Tipo incluido", "selT", sh.an.tipoVals, sh.an.tipoSel);
       h += `</div>`;
     });
@@ -568,8 +578,8 @@ function renderPending(){
     if (k==="include") sh.include = el.checked;
     else if (k==="format") sh.an.map.format = el.value;
     else if (k==="fy"){ sh.an.fileYear = +el.value || null; }
-    else if (k==="selM" || k==="selT"){ const vals = k==="selM" ? sh.an.marcaVals : sh.an.tipoVals; const set = k==="selM" ? sh.an.marcaSel : sh.an.tipoSel; const v = vals[+el.dataset.v][0]; el.checked ? set.add(v) : set.delete(v); }
-    else { sh.an.map[k] = +el.value; if (k==="marca") delete sh.an.marcaSel; if (k==="tipo") delete sh.an.tipoSel; }
+    else if (k==="selM" || k==="selT" || k==="selC"){ const vals = {selM:sh.an.marcaVals, selT:sh.an.tipoVals, selC:sh.an.cobVals}[k]; const set = {selM:sh.an.marcaSel, selT:sh.an.tipoSel, selC:sh.an.cobSel}[k]; const v = vals[+el.dataset.v][0]; el.checked ? set.add(v) : set.delete(v); }
+    else { sh.an.map[k] = +el.value; if (k==="marca") delete sh.an.marcaSel; if (k==="tipo") delete sh.an.tipoSel; if (k==="cobertura") delete sh.an.cobSel; }
     renderPending();
   }));
   $("btnAdd").onclick = commitPending;
