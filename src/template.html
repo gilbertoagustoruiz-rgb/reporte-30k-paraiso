@@ -196,6 +196,7 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
     <span class="sp"></span>
     <button class="btn sm" id="btnCopy">Copiar tabla</button>
     <button class="btn sm" id="btnXlsx" hidden>Descargar Excel</button>
+    <button class="btn sm primary" id="btnVentasAnio" hidden>⬇ Descargar ventas <span id="anioCurso"></span></button>
   </div>
 
   <div class="tblwrap"><table class="rep" id="rep"></table></div>
@@ -550,14 +551,18 @@ function detectPdvIssues(out){
   const sheets = [];
   for (const pf of out) for (const sh of (pf.sheets||[])){ const an = sh.an; if (!an || an.map.format!=="largo" || an.map.pdv<0 || an.map.idt<0) continue; sheets.push(sh);
     for (const r of an.body){ const p = r[an.map.pdv], id = r[an.map.idt]; if (p==null || p==="" || id==null || id==="") continue; const k = pdvKey(r, an.map); let m = counts.get(k); if (!m){ m = new Map(); counts.set(k,m); } const pv = String(p).trim(); m.set(pv, (m.get(pv)||0)+1); } }
-  const best = new Map();
-  for (const [k,m] of counts){ let bp=null, bc=-1; for (const [p,c] of m) if (c>bc){ bc=c; bp=p; } best.set(k, bp); }
+  const best = new Map(); let tot=0, agree=0;
+  for (const [k,m] of counts){ let bp=null, bc=-1, s=0; for (const [p,c] of m){ s+=c; if (c>bc){ bc=c; bp=p; } } best.set(k, bp); tot+=s; agree+=bc; }
+  // el ID TIENDA solo sirve de referencia si en el conjunto identifica a un PDV de forma consistente
+  const reliable = tot>0 && agree/tot >= 0.8;
   for (const sh of sheets){
     const an = sh.an; let n=0, bad=0; const ids = new Set(), pdvs = new Set();
     for (const r of an.body){ const p = r[an.map.pdv], id = r[an.map.idt]; if (p==null || p==="" || id==null || id==="") continue; n++; ids.add(norm(id)); pdvs.add(norm(p)); const b = best.get(pdvKey(r, an.map)); if (b && norm(b)!==norm(p)) bad++; }
     an.pdvMap = best;
-    an.pdvIssue = n ? {rate: bad/n, bad, n, ids: ids.size, pdvs: pdvs.size} : null;
-    an.fixPdv = !!(an.pdvIssue && an.pdvIssue.rate > 0.2);
+    // corregir solo si el PDV de la hoja está "aplastado" (menos PDV distintos que tiendas) y el ID es confiable
+    const flag = reliable && n && bad/n > 0.2 && ids.size >= pdvs.size && ids.size > 1;
+    an.pdvIssue = flag ? {rate: bad/n, bad, n, ids: ids.size, pdvs: pdvs.size} : null;
+    an.fixPdv = !!flag;
   }
 }
 
@@ -775,9 +780,9 @@ function renderAll(){
   renderView();
 }
 
-function filteredRows(){
+function filteredRows(yearOverride){
   const q = norm($("fSearch").value), cargo = $("fCargo").value, est = $("fEstado").value;
-  const refY = $("fYear").value, umbral = +$("fUmbral").value || 0;
+  const refY = yearOverride || $("fYear").value, umbral = +$("fUmbral").value || 0;
   return MODEL.rows.filter(r => {
     if (ui.chains.size && !ui.chains.has(r.c)) return false;
     if (q && !r.key.includes(q)) return false;
@@ -927,6 +932,62 @@ $("btnXlsx").onclick = async () => {
     else { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); a.download = fname; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 1000); }
   }catch(e){ if (e && e.code!=="declined") toast("No se pudo descargar ("+(e.code||e.message||"error")+")"); }
 };
+/* ---------- descarga: ventas del año en curso ---------- */
+const ANIO_CURSO = String(new Date().getFullYear());
+function saveXlsx(wb, fname){
+  const buf = XLSX.write(wb, {bookType:"xlsx", type:"array"});
+  if (downloads) return downloads.save({filename:fname, data:new Blob([buf])});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); a.download = fname; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 1000);
+}
+function numFmt(ws, fromCol, toCol, nRows, fmt){
+  for (let r=1; r<=nRows; r++) for (let c=fromCol; c<=toCol; c++){ const cell = ws[XLSX.utils.encode_cell({r, c})]; if (cell && cell.t==="n") cell.z = fmt; }
+}
+function buildVentasAnio(){
+  const Y = ANIO_CURSO, umbral = +$("fUmbral").value || 0;
+  const rows = filteredRows(Y).slice().sort((a,b)=>{ const ia=CHAIN_ORDER.indexOf(a.c), ib=CHAIN_ORDER.indexOf(b.c); return (ia<0?99:ia)-(ib<0?99:ib) || a.p.localeCompare(b.p); });
+  const months = MODEL.months.filter(m => m.startsWith(Y));
+  const brands = BRANDS;
+  const head = ["Cadena","Punto de venta","Cargo", ...brands.map(b=>BRAND_LABEL[b]), ...months.map(ymLabel), "Total "+Y, "Promedio "+Y, "Meses con venta", "Alertas + Promotoría", "< a "+(umbral>=1000? fmt0.format(umbral/1000)+"K" : umbral)];
+  const aoa = [head];
+  for (const r of rows){
+    const y = r.y[Y] || {t:null, p:null, n:0};
+    const st = statusOf(r, Y, umbral);
+    aoa.push([r.c, titleCase(r.p), r.inEstr ? r.g : "Sin estructura", ...brands.map(b => r.b[b]||0),
+      ...months.map(m => r.m[m]!=null ? Math.round(r.m[m]*100)/100 : null),
+      y.t!=null ? Math.round(y.t*100)/100 : null, y.p!=null ? Math.round(y.p*100)/100 : null, y.n||0,
+      r.inEstr ? (st.alert ? "ALERTA" : "OK") : "Sin estructura",
+      st.low==null ? "Sin venta" : (st.low ? "Alerta" : "OK")]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const c0 = 3 + brands.length;
+  numFmt(ws, c0, c0 + months.length + 1, aoa.length-1, "#,##0");
+  ws["!cols"] = [{wch:11},{wch:40},{wch:14}, ...brands.map(()=>({wch:9})), ...months.map(()=>({wch:11})), {wch:13},{wch:13},{wch:9},{wch:20},{wch:11}];
+  ws["!autofilter"] = {ref: XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:aoa.length-1, c:head.length-1}})};
+  ws["!freeze"] = {xSplit:2, ySplit:1};
+  // resumen por cadena
+  const byC = {};
+  for (const r of rows){ const x = (byC[r.c] ||= {n:0, par:0, v:0, ws:0, low:0, al:0}); const st = statusOf(r, Y, umbral); x.n++; x.par += r.par; x.v += (r.y[Y]?.t||0); if (st.low!==null) x.ws++; if (st.low) x.low++; if (st.alert) x.al++; }
+  const aoa2 = [["Cadena","PDV","Promotores Paraíso","Venta "+Y,"PDV con venta","< a 30K","% bajo umbral","Alertas + Promotoría"]];
+  Object.entries(byC).sort((a,b)=>b[1].v-a[1].v).forEach(([c,x]) => aoa2.push([c, x.n, Math.round(x.par*10)/10, Math.round(x.v*100)/100, x.ws, x.low, x.ws ? Math.round(x.low/x.ws*1000)/1000 : 0, x.al]));
+  const ws2 = XLSX.utils.aoa_to_sheet(aoa2);
+  numFmt(ws2, 3, 3, aoa2.length-1, "#,##0"); numFmt(ws2, 6, 6, aoa2.length-1, "0%");
+  ws2["!cols"] = [{wch:12},{wch:6},{wch:18},{wch:15},{wch:14},{wch:9},{wch:13},{wch:20}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Ventas " + Y);
+  XLSX.utils.book_append_sheet(wb, ws2, "Resumen por cadena");
+  return {wb, rows: rows.length, months: months.length};
+}
+$("anioCurso").textContent = ANIO_CURSO;
+$("btnVentasAnio").onclick = async () => {
+  try{
+    const {wb, rows, months} = buildVentasAnio();
+    if (!months) toast(`Aún no hay ventas cargadas de ${ANIO_CURSO}: el archivo sale solo con la estructura.`);
+    const hoy = new Date(); const f = hoy.getFullYear()+"-"+String(hoy.getMonth()+1).padStart(2,"0")+"-"+String(hoy.getDate()).padStart(2,"0");
+    await saveXlsx(wb, `Ventas_Paraiso_${ANIO_CURSO}_al_${f}.xlsx`);
+    if (months) toast(`Excel de ventas ${ANIO_CURSO}: ${rows} tiendas, ${months} meses`);
+  }catch(e){ if (e && e.code!=="declined") toast("No se pudo descargar ("+(e.code||e.message||"error")+")"); }
+};
+
 // tooltip
 document.addEventListener("mousemove", e => { const el = e.target.closest("[data-tip]"); const tp = $("tip"); if (!el){ tp.style.display="none"; return; } tp.textContent = el.dataset.tip; tp.style.display="block"; tp.style.left = Math.min(e.clientX+12, innerWidth-270)+"px"; tp.style.top = (e.clientY+14)+"px"; });
 
@@ -939,7 +1000,7 @@ renderAll();
     }
   }catch(e){}
   // fuera de claude.ai (p. ej. Render) la descarga directa del navegador funciona
-  if (downloads || !window.claude) $("btnXlsx").hidden = false;
+  if (downloads || !window.claude){ $("btnXlsx").hidden = false; $("btnVentasAnio").hidden = false; }
   await loadPersisted();
   renderAll();
 })();
