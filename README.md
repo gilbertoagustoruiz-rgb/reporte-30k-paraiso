@@ -8,8 +8,11 @@ Dashboard web del reporte 30K de la cuenta Paraíso (Below Trade): venta mensual
    Por defecto solo suma las marcas Paraíso, Krea, Komfort, Viva Home y Casa Joven (columna MARCA) y solo las filas COBERTURADO o COBERTURADOS (columna COBERTURA); se puede cambiar en la revisión.
 3. Pulsa **Agregar al reporte**. Los datos se procesan en el navegador y quedan guardados en ese navegador (localStorage); no se envían a ningún servidor.
 
+## Ventas de competencia
+Las filas cuya MARCA no pertenece al grupo Paraíso (Paraíso, Casa Joven, Viva Home, Krea, Komfort) se guardan como **venta de competencia**. El selector «Ventas de» cambia la tabla entre el grupo Paraíso y la competencia. Las alertas (< a 30K y promotoría) siempre usan la venta Paraíso.
+
 ## Descargas
-- **Descargar ventas (año en curso)**: Excel con las ventas mes a mes, total, promedio y alertas por tienda del año actual (según la fecha del sistema), sin importar el año elegido en pantalla. Respeta los filtros de cadena, búsqueda, cargo y estado. Incluye una hoja de resumen por cadena.
+- **Descargar ventas (año en curso)**: Excel con las ventas mes a mes, total, promedio y alertas por tienda del año actual (según la fecha del sistema), sin importar el año elegido en pantalla. Respeta los filtros de cadena, búsqueda, cargo y estado. Incluye una hoja de resumen por cadena (con participación Paraíso vs competencia) y una hoja «Competencia» con la venta mensual de las demás marcas por tienda.
 - **Descargar Excel**: la tabla tal como se ve en pantalla.
 
 ## Estructura del repositorio

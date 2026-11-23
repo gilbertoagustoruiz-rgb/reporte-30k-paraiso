@@ -184,6 +184,7 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
     <label>Buscar punto de venta<input type="search" id="fSearch" placeholder="Ej. Plaza Vea Lima Ate"></label>
     <label>Cargo<select id="fCargo"><option value="">Todos</option><option>Titular</option><option>Volante</option><option value="-">Sin estructura (descoberturadas)</option></select></label>
     <label>Estado<select id="fEstado"><option value="">Todos</option><option value="low">Bajo umbral (&lt; 30K)</option><option value="alertprom">Alerta de promotoría</option><option value="ok">OK</option><option value="nosale">Sin venta en año ref.</option></select></label>
+    <label>Ventas de<select id="fSerie"><option value="par">Grupo Paraíso (Paraíso, Casa Joven, Viva Home, Krea, Komfort)</option><option value="comp">Competencia (resto de marcas)</option></select></label>
     <label>Año de referencia<select id="fYear"></select></label>
     <label>Umbral promedio (S/)<input type="number" id="fUmbral" value="30000" step="1000" min="0" style="min-width:110px"></label>
     <label>Detalle mensual<select id="fDet"><option value="all">Todos los meses</option><option value="ref">Solo año ref.</option><option value="none">Solo totales</option></select></label>
@@ -305,6 +306,11 @@ async function persistFile(id){
       (byYear[y] ||= {})[k] ||= {p:s.p, c:s.c, m:{}};
       byYear[y][k].m[ym] = v;
     }
+    for (const [ym,v] of Object.entries(s.mc||{})){
+      const y = ym.slice(0,4);
+      const e = ((byYear[y] ||= {})[k] ||= {p:s.p, c:s.c, m:{}});
+      (e.mc ||= {})[ym] = v;
+    }
   }
   if (db){
     try{
@@ -345,6 +351,7 @@ async function loadPersisted(){
         for (const [k,s] of Object.entries(x.stores||{})){
           const t = (fd[id].stores[k] ||= {p:s.p, c:s.c, m:{}});
           Object.assign(t.m, s.m);
+          if (s.mc) Object.assign((t.mc ||= {}), s.mc);
         }
       }
       fileData = fd;
@@ -462,10 +469,17 @@ function aggregateSheet(an, chainHint){
   defaultSel(an);
   const inSel = (sel, col, r) => !sel || col<0 || map.format!=="largo" || sel.has(String(r[col] ?? "").trim());
   const passes = r => inSel(an.marcaSel, map.marca, r) && inSel(an.tipoSel, map.tipo, r) && inSel(an.cobSel, map.cobertura, r);
-  const stores = {}; let rows=0, skipped=0, total=0, excl=0;
+  const stores = {}; let rows=0, skipped=0, total=0, excl=0, totalComp=0;
   const perMonth = {}, badDate = new Map(), diag = {};
   let curRow = null;
-  const add = (pdv, cad, ym, v) => {
+  const add = (pdv, cad, ym, v, comp) => {
+    if (comp){
+      if (v==null || !ym) return;
+      const k = norm(pdv); if (!k || /^TOTAL|SUBTOTAL|GRAN TOTAL/.test(k)) return;
+      const s = (stores[k] ||= {p:String(pdv).trim(), c:inferChain(pdv, cad||chainHint), m:{}});
+      s.mc ||= {}; s.mc[ym] = Math.round(((s.mc[ym]||0) + v)*100)/100; totalComp += v;
+      return;
+    }
     if (v==null || !ym) { skipped++;
       if (!ym && curRow){ const raw = [map.mes>=0?curRow[map.mes]:null, map.anio>=0?curRow[map.anio]:null, map.fecha>=0?curRow[map.fecha]:null].map(x => x instanceof Date ? x.toISOString().slice(0,10) : (x==null?"∅":String(x))).join(" | "); badDate.set(raw, (badDate.get(raw)||0)+1); }
       return; }
@@ -491,16 +505,20 @@ function aggregateSheet(an, chainHint){
       let p = r[map.pdv];
       if (an.fixPdv && an.pdvMap){ const fx = an.pdvMap.get(pdvKey(r, map)); if (fx) p = fx; }
       if (p==null || String(p).trim()===""){ dg.noPdv++; continue; }
-      if (!inSel(an.marcaSel, map.marca, r)){ dg.marca++; excl++; continue; }
       if (!inSel(an.cobSel, map.cobertura, r)){ dg.cob++; excl++; continue; }
       if (!inSel(an.tipoSel, map.tipo, r)){ dg.tipo++; excl++; continue; }
+      if (!inSel(an.marcaSel, map.marca, r)){
+        // marca fuera del grupo Paraíso -> venta de competencia
+        dg.marca++; const vc = num(r[map.venta]); if (vc!=null && ym) dg.vc = (dg.vc||0) + vc;
+        add(p, map.cadena>=0 ? r[map.cadena] : "", ym, vc, true); continue;
+      }
       const v = num(r[map.venta]);
       if (v==null){ dg.noVal++; }
       else if (ym){ dg.ok++; dg.v += v; }
       add(p, map.cadena>=0 ? r[map.cadena] : "", ym, v);
     }
   }
-  return {stores, rows, skipped, total, excl, perMonth, badDate, diag, nBody: body.length};
+  return {stores, rows, skipped, total, totalComp, excl, perMonth, badDate, diag, nBody: body.length};
 }
 
 // Algunos Excel (sobre todo .xlsb exportados por sistemas) declaran un rango menor al real;
@@ -588,7 +606,8 @@ function renderPending(){
       const ys = [...yms].sort();
       h += agg.error ? ` <span class="pill bad">${esc(agg.error)}</span>` : ` <span class="pill ok">${nS} PDV · ${ys.length? ymLabel(ys[0])+" a "+ymLabel(ys[ys.length-1]) : "sin meses"} · ${fmtS(agg.total)}</span>`;
       if (agg.skipped) h += ` <span class="pill bad">${fmtN(agg.skipped)} filas sin mes o sin monto</span>`;
-      if (agg.excl) h += ` <span class="pill">${fmtN(agg.excl)} filas excluidas (marca, cobertura o tipo)</span>`;
+      if (agg.totalComp) h += ` <span class="pill">Competencia: ${fmtS(agg.totalComp)}</span>`;
+      if (agg.excl) h += ` <span class="pill">${fmtN(agg.excl)} filas fuera del grupo Paraíso o excluidas por cobertura/tipo</span>`;
       if (sh.an.pdvIssue && sh.an.pdvIssue.rate > 0.2){
         const pi = sh.an.pdvIssue;
         h += `<div class="msg err" style="margin-top:6px">⚠ En esta hoja la columna <b>${esc(String(sh.an.headers[sh.an.map.pdv]))}</b> no coincide con CADENA + ID TIENDA en ${Math.round(pi.rate*100)}% de las filas (${fmtN(pi.bad)} de ${fmtN(pi.n)}; ${pi.pdvs} PDV distintos para ${pi.ids} tiendas). <label style="display:inline-flex;gap:4px;align-items:center;color:var(--ink)"><input type="checkbox" data-f="${fi}" data-s="${si}" data-k="fixPdv" ${sh.an.fixPdv?"checked":""}> Corregir el PDV usando CADENA + ID TIENDA de las otras hojas</label></div>`;
@@ -598,8 +617,8 @@ function renderPending(){
       }
       if (agg.diag && Object.keys(agg.diag).length){
         const ks = Object.keys(agg.diag).sort();
-        h += `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600">Desglose por mes: filas leídas y por qué se descartan (${fmtN(agg.nBody)} filas en la hoja)</summary><div style="overflow:auto"><table class="chainsum" style="font-size:11px;margin-top:6px"><thead><tr><th>Mes</th><th>Filas</th><th>Sin PDV</th><th>Otra marca</th><th>No coberturado</th><th>Otro tipo</th><th>Sin monto</th><th>Sumadas</th><th>Monto</th></tr></thead><tbody>` +
-          ks.map(k => { const d = agg.diag[k]; return `<tr><td><b>${k==="?"?"Sin mes":ymLabel(k)}</b></td><td>${fmtN(d.tot)}</td><td>${fmtN(d.noPdv)}</td><td>${fmtN(d.marca)}</td><td>${fmtN(d.cob)}</td><td>${fmtN(d.tipo)}</td><td>${fmtN(d.noVal)}</td><td>${fmtN(d.ok)}</td><td>${fmtS(d.v)}</td></tr>`; }).join("") + `</tbody></table></div></details>`;
+        h += `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600">Desglose por mes: filas leídas y por qué se descartan (${fmtN(agg.nBody)} filas en la hoja)</summary><div style="overflow:auto"><table class="chainsum" style="font-size:11px;margin-top:6px"><thead><tr><th>Mes</th><th>Filas</th><th>Sin PDV</th><th>Competencia</th><th>Monto competencia</th><th>No coberturado</th><th>Otro tipo</th><th>Sin monto</th><th>Sumadas</th><th>Monto</th></tr></thead><tbody>` +
+          ks.map(k => { const d = agg.diag[k]; return `<tr><td><b>${k==="?"?"Sin mes":ymLabel(k)}</b></td><td>${fmtN(d.tot)}</td><td>${fmtN(d.noPdv)}</td><td>${fmtN(d.marca)}</td><td>${fmtS(d.vc||0)}</td><td>${fmtN(d.cob)}</td><td>${fmtN(d.tipo)}</td><td>${fmtN(d.noVal)}</td><td>${fmtN(d.ok)}</td><td>${fmtS(d.v)}</td></tr>`; }).join("") + `</tbody></table></div></details>`;
       }
       if (agg.badDate && agg.badDate.size){
         h += `<div class="msg err">Valores de MES | AÑO | FECHA que no se pudieron leer: ` + [...agg.badDate.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([v,c])=>`<b>${esc(v)}</b> (${fmtN(c)})`).join(", ") + `</div>`;
@@ -628,7 +647,7 @@ function renderPending(){
         vals.slice(0,40).forEach(([v,c],vi)=>{ x += `<label class="chip ${sel.has(v)?"on":""}" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" data-f="${fi}" data-s="${si}" data-k="${key}" data-v="${vi}" ${sel.has(v)?"checked":""} hidden>${esc(v)} <span style="opacity:.6">${fmtN(c)}</span></label>`; });
         return x + `</div>`;
       };
-      if (m.format==="largo" && m.marca>=0) h += vbox("Marcas incluidas (por defecto: Paraíso, Krea, Komfort, Viva Home, Casa Joven)", "selM", sh.an.marcaVals, sh.an.marcaSel);
+      if (m.format==="largo" && m.marca>=0) h += vbox("Marcas del grupo Paraíso (por defecto: Paraíso, Krea, Komfort, Viva Home, Casa Joven) — las no marcadas van a «Competencia»", "selM", sh.an.marcaVals, sh.an.marcaSel);
       if (m.format==="largo" && m.cobertura>=0) h += vbox("Cobertura incluida (por defecto: COBERTURADO y COBERTURADOS)", "selC", sh.an.cobVals, sh.an.cobSel);
       if (m.format==="largo" && m.tipo>=0 && sh.an.tipoVals.length>1) h += vbox("Tipo incluido", "selT", sh.an.tipoVals, sh.an.tipoSel);
       h += `</div>`;
@@ -662,6 +681,7 @@ async function commitPending(){
       for (const [k,s] of Object.entries(sh.agg.stores)){
         const t = (stores[k] ||= {p:s.p, c:s.c, m:{}});
         for (const [ym,v] of Object.entries(s.m)) t.m[ym] = Math.round(((t.m[ym]||0)+v)*100)/100;
+        if (s.mc){ t.mc ||= {}; for (const [ym,v] of Object.entries(s.mc)) t.mc[ym] = Math.round(((t.mc[ym]||0)+v)*100)/100; }
       }
     }
     if (!Object.keys(stores).length) continue;
@@ -706,33 +726,33 @@ function buildModel(){
   const map = new Map();
   for (const e of estructura){
     const k = norm(e.p);
-    if (!map.has(k)) map.set(k, {key:k, c:e.c, p:e.p, g:e.g||"", b:{...e.b}, inEstr:true, m:{}});
+    if (!map.has(k)) map.set(k, {key:k, c:e.c, p:e.p, g:e.g||"", b:{...e.b}, inEstr:true, mp:{}, mc:{}});
   }
   const unmatched = [];
   const merged = {};
   for (const f of Object.values(fileData)) for (const [k,s] of Object.entries(f.stores)){
-    const t = (merged[k] ||= {p:s.p, c:s.c, m:{}});
+    const t = (merged[k] ||= {p:s.p, c:s.c, m:{}, mc:{}});
     for (const [ym,v] of Object.entries(s.m)) t.m[ym] = (t.m[ym]||0) + v;
+    for (const [ym,v] of Object.entries(s.mc||{})) t.mc[ym] = (t.mc[ym]||0) + v;
   }
   for (const [k,s] of Object.entries(merged)){
     let row = map.get(k);
-    if (!row){ row = {key:k, c:s.c, p:titleCase(s.p), g:"", b:{}, inEstr:false, m:{}}; map.set(k,row); unmatched.push(s.p); }
-    for (const [ym,v] of Object.entries(s.m)) row.m[ym] = (row.m[ym]||0) + v;
+    if (!row){ row = {key:k, c:s.c, p:titleCase(s.p), g:"", b:{}, inEstr:false, mp:{}, mc:{}}; map.set(k,row); if (Object.keys(s.m).length) unmatched.push(s.p); }
+    for (const [ym,v] of Object.entries(s.m)) row.mp[ym] = (row.mp[ym]||0) + v;
+    for (const [ym,v] of Object.entries(s.mc)) row.mc[ym] = (row.mc[ym]||0) + v;
   }
   const rows = [...map.values()];
-  const yms = new Set(); rows.forEach(r => Object.keys(r.m).forEach(k => yms.add(k)));
+  const yms = new Set(); rows.forEach(r => { Object.keys(r.mp).forEach(k => yms.add(k)); Object.keys(r.mc).forEach(k => yms.add(k)); });
   const months = [...yms].sort();
   const years = [...new Set(months.map(m=>m.slice(0,4)))];
+  const yearly = mm => { const o = {}; for (const y of years){ let t=0,n=0; for (const [ym,v] of Object.entries(mm)) if (ym.startsWith(y)){ t+=v; if (v) n++; } o[y] = {t: n? t : null, p: n? t/n : null, n}; } return o; };
   for (const r of rows){
-    r.y = {};
-    for (const y of years){
-      let t=0,n=0; for (const [ym,v] of Object.entries(r.m)) if (ym.startsWith(y)){ t+=v; if (v) n++; }
-      r.y[y] = {t: n? t : null, p: n? t/n : null, n};
-    }
+    r.yp = yearly(r.mp); r.yc = yearly(r.mc);
     r.par = r.b.PARAISO || 0;
   }
-  const noSales = rows.filter(r => r.inEstr && !Object.keys(r.m).length).length;
-  return {rows, months, years, unmatched, noSales, hasSales: months.length>0};
+  const hasComp = rows.some(r => Object.keys(r.mc).length);
+  const noSales = rows.filter(r => r.inEstr && !Object.keys(r.mp).length).length;
+  return {rows, months, years, unmatched, noSales, hasSales: months.length>0, hasComp};
 }
 
 // Alerta de promotoría (fórmula del Excel): ALERTA si alguna marca de la competencia
@@ -741,7 +761,7 @@ const COMPETENCIA = ["EL CISNE","DRIMER","FORLI","ROSEN","DROM","SIMONS","TECHNO
 function promAlert(r){ return r.inEstr && COMPETENCIA.some(b => (r.b[b]||0) > (r.b.PARAISO||0)); }
 function statusOf(r, refY, umbral){
   const alert = promAlert(r);
-  const y = r.y[refY];
+  const y = r.yp[refY];
   if (!y || y.p==null) return {low:null, alert};
   return {low: y.p < umbral, alert};
 }
@@ -799,7 +819,14 @@ function filteredRows(yearOverride){
   });
 }
 
+function applySerie(){
+  const comp = $("fSerie").value === "comp";
+  for (const r of MODEL.rows){ r.m = comp ? r.mc : r.mp; r.y = comp ? r.yc : r.yp; }
+  return comp;
+}
 function renderView(){
+  const COMP = applySerie();
+  const SER = COMP ? "competencia" : "Paraíso";
   const refY = $("fYear").value, umbral = +$("fUmbral").value || 0;
   const rows = filteredRows();
   const uLbl = umbral>=1000 ? fmt0.format(umbral/1000)+"K" : fmt0.format(umbral);
@@ -809,7 +836,7 @@ function renderView(){
   rows.forEach(r=>{ const s = statusOf(r, refY, umbral); if (s.low) low++; if (s.alert) alert++; if (s.low!==null) withSale++; ventaRef += (r.y[refY]?.t||0); par += r.par; });
   const kp = [
     ["Puntos de venta", fmtN(rows.length), `${withSale} con venta en ${refY||"—"}`],
-    [`Venta ${refY||""}`, MODEL.hasSales? fmtS(ventaRef) : "—", MODEL.hasSales ? `${MODEL.months.filter(m=>m.startsWith(refY)).length} meses con datos` : "Sube archivos de venta"],
+    [`Venta ${SER} ${refY||""}`, MODEL.hasSales? fmtS(ventaRef) : "—", MODEL.hasSales ? `${MODEL.months.filter(m=>m.startsWith(refY)).length} meses con datos` : "Sube archivos de venta"],
     [`< a ${uLbl} (prom. ${refY||"—"})`, MODEL.hasSales? fmtN(low) : "—", withSale? `${Math.round(low/withSale*100)}% de las tiendas con venta` : ""],
     ["Alertas + promotoría", fmtN(alert), "Competencia con más promotores que Paraíso"],
     ["Promotores Paraíso", fmt0.format(Math.round(par*100)/100), "Suma de la estructura (incluye medios turnos)"],
@@ -819,9 +846,9 @@ function renderView(){
   const byC = {};
   rows.forEach(r=>{ const c = (byC[r.c] ||= {n:0, ws:0, low:0, al:0, v:0, par:0}); c.n++; c.par+=r.par; const s = statusOf(r, refY, umbral); if (s.low!==null) c.ws++; if (s.low) c.low++; if (s.alert) c.al++; c.v += (r.y[refY]?.t||0); });
   const cs = Object.entries(byC).sort((a,b)=>b[1].v-a[1].v);
-  $("chainTitle").textContent = `Resumen por cadena · ${refY||"sin ventas"}`;
-  $("chainHint").textContent = MODEL.hasSales ? `Tiendas con promedio mensual ${refY} bajo S/ ${fmt0.format(umbral)}.` : "Aún no hay ventas cargadas: se muestra solo la estructura.";
-  $("chainTbl").innerHTML = `<thead><tr><th>Cadena</th><th>PDV</th><th>Prom. Paraíso</th><th>Venta ${esc(refY||"")}</th><th>Con venta</th><th>&lt; ${uLbl}</th><th>% bajo umbral</th><th>Alerta + promotoría</th></tr></thead><tbody>` +
+  $("chainTitle").textContent = `Resumen por cadena · ${refY||"sin ventas"}` + (COMP ? " · venta de competencia" : "");
+  $("chainHint").textContent = MODEL.hasSales ? `Tiendas con promedio mensual ${refY} de venta Paraíso bajo S/ ${fmt0.format(umbral)}.` + (COMP ? " La columna de venta muestra la competencia; las alertas siempre se calculan con la venta Paraíso." : "") : "Aún no hay ventas cargadas: se muestra solo la estructura.";
+  $("chainTbl").innerHTML = `<thead><tr><th>Cadena</th><th>PDV</th><th>Prom. Paraíso</th><th>Venta ${COMP?"competencia":"Paraíso"} ${esc(refY||"")}</th><th>Con venta</th><th>&lt; ${uLbl}</th><th>% bajo umbral</th><th>Alerta + promotoría</th></tr></thead><tbody>` +
     cs.map(([c,x])=>{ const pct = x.ws? x.low/x.ws : 0; return `<tr><td><b>${esc(c)}</b></td><td>${x.n}</td><td>${fmt0.format(Math.round(x.par*10)/10)}</td><td>${MODEL.hasSales?fmtS(x.v):"—"}</td><td>${MODEL.hasSales?x.ws:"—"}</td><td>${MODEL.hasSales?x.low:"—"}</td><td><div class="meter" data-tip="${esc(c)}: ${x.low} de ${x.ws} tiendas con venta (${Math.round(pct*100)}%)"><span>${MODEL.hasSales?Math.round(pct*100)+"%":"—"}</span><span class="bar"><i style="width:${pct*100}%"></i></span></div></td><td>${x.al}</td></tr>`; }).join("") + `</tbody>`;
   // tabla principal
   renderTable(rows, refY, umbral, uLbl);
@@ -830,6 +857,7 @@ function renderView(){
 
 function columns(refY){
   const det = $("fDet").value, bm = $("fBrands").value;
+  const VL = $("fSerie").value==="comp" ? "Venta competencia " : "Venta Paraíso ";
   const cols = [];
   cols.push({k:"c", label:"Cadena", grp:"", cls:"st1", get:r=>r.c, sort:r=>r.c});
   cols.push({k:"p", label:"Punto de venta", grp:"", cls:"st2", get:r=>titleCase(r.p), sort:r=>r.p});
@@ -837,9 +865,9 @@ function columns(refY){
   const brands = bm==="none" ? [] : bm==="par" ? ["PARAISO"] : BRANDS;
   brands.forEach(b => cols.push({k:"b_"+b, label:BRAND_LABEL[b], grp:"Promotores", brand:b, get:r=>r.b[b]||0, sort:r=>r.b[b]||0}));
   for (const y of MODEL.years){
-    if (det==="all" || (det==="ref" && y===refY)) MODEL.months.filter(m=>m.startsWith(y)).forEach(ym => cols.push({k:"m_"+ym, label:ymLabel(ym), grp:"Venta "+y, num:true, get:r=>r.m[ym]??null, sort:r=>r.m[ym]??-1}));
-    cols.push({k:"t_"+y, label:"Total "+y, grp:"Venta "+y, num:true, tot:true, get:r=>r.y[y].t, sort:r=>r.y[y].t??-1});
-    cols.push({k:"p_"+y, label:"Promedio "+y, grp:"Venta "+y, num:true, tot:true, prom:y, get:r=>r.y[y].p, sort:r=>r.y[y].p??-1});
+    if (det==="all" || (det==="ref" && y===refY)) MODEL.months.filter(m=>m.startsWith(y)).forEach(ym => cols.push({k:"m_"+ym, label:ymLabel(ym), grp:VL+y, num:true, get:r=>r.m[ym]??null, sort:r=>r.m[ym]??-1}));
+    cols.push({k:"t_"+y, label:"Total "+y, grp:VL+y, num:true, tot:true, get:r=>r.y[y].t, sort:r=>r.y[y].t??-1});
+    cols.push({k:"p_"+y, label:"Promedio "+y, grp:VL+y, num:true, tot:true, prom: $("fSerie").value==="comp" ? null : y, get:r=>r.y[y].p, sort:r=>r.y[y].p??-1});
   }
   cols.push({k:"ap", label:"Alertas + promotoría", grp:"Alertas", status:"ap", sort:r=>r._st.alert?1:0});
   if (MODEL.hasSales) cols.push({k:"lo", label:"< a 30K", grp:"Alertas", status:"lo", sort:r=>r._st.low==null?-1:r._st.low?1:0});
@@ -917,7 +945,7 @@ bindDrop($("dropVentas"), $("inVentas"), handleVentasFiles, true);
 bindDrop($("dropEstr"), $("inEstr"), handleEstrFile, false);
 $("btnUploadTop").onclick = () => { $("uploadCard").scrollIntoView({behavior:"smooth"}); $("inVentas").click(); };
 let st; $("fSearch").addEventListener("input", () => { clearTimeout(st); st = setTimeout(renderView, 150); });
-["fCargo","fEstado","fYear","fUmbral","fDet","fBrands","fNoEstr"].forEach(id => $(id).addEventListener("change", renderView));
+["fCargo","fEstado","fYear","fUmbral","fDet","fBrands","fNoEstr","fSerie"].forEach(id => $(id).addEventListener("change", renderView));
 $("btnCopy").onclick = async () => {
   const tsv = exportAoa().map(r => r.map(v => v==null ? "" : String(v)).join("\t")).join("\n");
   try{ await navigator.clipboard.writeText(tsv); toast("Tabla copiada: pégala en Excel"); }catch(e){ toast("No se pudo copiar en esta vista"); }
@@ -950,10 +978,10 @@ function buildVentasAnio(){
   const head = ["Cadena","Punto de venta","Cargo", ...brands.map(b=>BRAND_LABEL[b]), ...months.map(ymLabel), "Total "+Y, "Promedio "+Y, "Meses con venta", "Alertas + Promotoría", "< a "+(umbral>=1000? fmt0.format(umbral/1000)+"K" : umbral)];
   const aoa = [head];
   for (const r of rows){
-    const y = r.y[Y] || {t:null, p:null, n:0};
+    const y = r.yp[Y] || {t:null, p:null, n:0};
     const st = statusOf(r, Y, umbral);
     aoa.push([r.c, titleCase(r.p), r.inEstr ? r.g : "Sin estructura", ...brands.map(b => r.b[b]||0),
-      ...months.map(m => r.m[m]!=null ? Math.round(r.m[m]*100)/100 : null),
+      ...months.map(m => r.mp[m]!=null ? Math.round(r.mp[m]*100)/100 : null),
       y.t!=null ? Math.round(y.t*100)/100 : null, y.p!=null ? Math.round(y.p*100)/100 : null, y.n||0,
       r.inEstr ? (st.alert ? "ALERTA" : "OK") : "Sin estructura",
       st.low==null ? "Sin venta" : (st.low ? "Alerta" : "OK")]);
@@ -966,15 +994,29 @@ function buildVentasAnio(){
   ws["!freeze"] = {xSplit:2, ySplit:1};
   // resumen por cadena
   const byC = {};
-  for (const r of rows){ const x = (byC[r.c] ||= {n:0, par:0, v:0, ws:0, low:0, al:0}); const st = statusOf(r, Y, umbral); x.n++; x.par += r.par; x.v += (r.y[Y]?.t||0); if (st.low!==null) x.ws++; if (st.low) x.low++; if (st.alert) x.al++; }
-  const aoa2 = [["Cadena","PDV","Promotores Paraíso","Venta "+Y,"PDV con venta","< a 30K","% bajo umbral","Alertas + Promotoría"]];
-  Object.entries(byC).sort((a,b)=>b[1].v-a[1].v).forEach(([c,x]) => aoa2.push([c, x.n, Math.round(x.par*10)/10, Math.round(x.v*100)/100, x.ws, x.low, x.ws ? Math.round(x.low/x.ws*1000)/1000 : 0, x.al]));
+  for (const r of rows){ const x = (byC[r.c] ||= {n:0, par:0, v:0, ws:0, low:0, al:0}); const st = statusOf(r, Y, umbral); x.n++; x.par += r.par; x.v += (r.yp[Y]?.t||0); x.vc = (x.vc||0) + (r.yc[Y]?.t||0); if (st.low!==null) x.ws++; if (st.low) x.low++; if (st.alert) x.al++; }
+  const aoa2 = [["Cadena","PDV","Promotores Paraíso","Venta Paraíso "+Y,"Venta competencia "+Y,"Participación Paraíso","PDV con venta","< a 30K","% bajo umbral","Alertas + Promotoría"]];
+  Object.entries(byC).sort((a,b)=>b[1].v-a[1].v).forEach(([c,x]) => aoa2.push([c, x.n, Math.round(x.par*10)/10, Math.round(x.v*100)/100, Math.round((x.vc||0)*100)/100, (x.v+(x.vc||0)) ? Math.round(x.v/(x.v+(x.vc||0))*1000)/1000 : 0, x.ws, x.low, x.ws ? Math.round(x.low/x.ws*1000)/1000 : 0, x.al]));
   const ws2 = XLSX.utils.aoa_to_sheet(aoa2);
-  numFmt(ws2, 3, 3, aoa2.length-1, "#,##0"); numFmt(ws2, 6, 6, aoa2.length-1, "0%");
-  ws2["!cols"] = [{wch:12},{wch:6},{wch:18},{wch:15},{wch:14},{wch:9},{wch:13},{wch:20}];
+  numFmt(ws2, 3, 4, aoa2.length-1, "#,##0"); numFmt(ws2, 5, 5, aoa2.length-1, "0%"); numFmt(ws2, 8, 8, aoa2.length-1, "0%");
+  ws2["!cols"] = [{wch:12},{wch:6},{wch:18},{wch:18},{wch:20},{wch:20},{wch:14},{wch:9},{wch:13},{wch:20}];
+  // hoja de competencia: venta mensual de las demás marcas por tienda
+  const monthsC = MODEL.months.filter(m => m.startsWith(Y));
+  const aoa3 = [["Cadena","Punto de venta","Cargo", ...COMPETENCIA.map(b=>"Prom. "+BRAND_LABEL[b]), ...monthsC.map(ymLabel), "Total competencia "+Y, "Promedio competencia "+Y, "Venta Paraíso "+Y, "Participación Paraíso"]];
+  for (const r of rows){
+    const yc = r.yc[Y] || {t:null,p:null}, yp = r.yp[Y] || {t:null};
+    const tp = yp.t||0, tc = yc.t||0;
+    aoa3.push([r.c, titleCase(r.p), r.inEstr ? r.g : "Sin estructura", ...COMPETENCIA.map(b => r.b[b]||0), ...monthsC.map(m => r.mc[m]!=null ? Math.round(r.mc[m]*100)/100 : null), yc.t!=null ? Math.round(yc.t*100)/100 : null, yc.p!=null ? Math.round(yc.p*100)/100 : null, yp.t!=null ? Math.round(yp.t*100)/100 : null, (tp+tc) ? Math.round(tp/(tp+tc)*1000)/1000 : null]);
+  }
+  const ws3 = XLSX.utils.aoa_to_sheet(aoa3);
+  const c3 = 3 + COMPETENCIA.length;
+  numFmt(ws3, c3, c3 + monthsC.length + 2, aoa3.length-1, "#,##0"); numFmt(ws3, c3 + monthsC.length + 3, c3 + monthsC.length + 3, aoa3.length-1, "0%");
+  ws3["!cols"] = [{wch:11},{wch:40},{wch:14}, ...COMPETENCIA.map(()=>({wch:10})), ...monthsC.map(()=>({wch:11})), {wch:18},{wch:20},{wch:16},{wch:12}];
+  ws3["!autofilter"] = {ref: XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:aoa3.length-1, c:aoa3[0].length-1}})};
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Ventas " + Y);
   XLSX.utils.book_append_sheet(wb, ws2, "Resumen por cadena");
+  XLSX.utils.book_append_sheet(wb, ws3, "Competencia " + Y);
   return {wb, rows: rows.length, months: months.length};
 }
 $("anioCurso").textContent = ANIO_CURSO;
