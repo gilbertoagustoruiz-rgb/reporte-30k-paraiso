@@ -145,13 +145,13 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
 
   <section class="card" id="uploadCard">
     <h2>Datos del reporte</h2>
-    <p class="hint">Sube tus Excel (.xlsx, .xls) o CSV de venta anual. La página detecta las columnas de punto de venta, fecha o mes y venta; revisa el mapeo y agrégalo. Cada archivo se cruza con la estructura de promotoría por nombre de punto de venta.</p>
+    <p class="hint">Sube tus Excel (.xlsx, .xls, .xlsb) o CSV de venta anual. La página detecta las columnas de punto de venta, fecha o mes y venta; revisa el mapeo y agrégalo. Cada archivo se cruza con la estructura de promotoría por nombre de punto de venta.</p>
     <div class="grid2">
       <div>
         <div class="drop" id="dropVentas">
           <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
           <div class="tx"><b>Archivos de venta</b><span>Arrastra aquí uno o varios archivos, o elígelos.</span></div>
-          <label class="btn primary">Elegir archivos<input type="file" id="inVentas" accept=".xlsx,.xls,.xlsm,.csv,.txt" multiple hidden></label>
+          <label class="btn primary">Elegir archivos<input type="file" id="inVentas" accept=".xlsx,.xls,.xlsm,.xlsb,.csv,.txt" multiple hidden></label>
         </div>
         <div id="previewVentas"></div>
         <div class="files" id="filesList"></div>
@@ -208,6 +208,7 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
 const ESTRUCTURA_BASE = __ESTRUCTURA__;
 const BRANDS = ["PARAISO","EL CISNE","FORLI","ROSEN","DRIMER","DROM","SIMONS","TECHNODREAM","RIZZOLI","SERTA"];
 const BRAND_LABEL = {"PARAISO":"Paraíso","EL CISNE":"El Cisne","FORLI":"Forli","ROSEN":"Rosen","DRIMER":"Drimer","DROM":"Drom","SIMONS":"Simmons","TECHNODREAM":"Technodream","RIZZOLI":"Rizzoli","SERTA":"Serta"};
+const MARCAS_DEFAULT = ["PARAISO","KREA","KOMFORT","VIVA HOME","VIVAHOME","CASA JOVEN","CASAJOVEN"];
 const CHAIN_ORDER = ["Conecta","Estilos","Falabella","Hiraoka","Metro","Oechsle","Plaza Vea","Ripley","Sodimac","Tottus"];
 const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const MONTHS = {ENE:1,ENERO:1,JAN:1,JANUARY:1,FEB:2,FEBRERO:2,FEBRUARY:2,MAR:3,MARZO:3,MARCH:3,ABR:4,ABRIL:4,APR:4,APRIL:4,MAY:5,MAYO:5,JUN:6,JUNIO:6,JUNE:6,JUL:7,JULIO:7,JULY:7,AGO:8,AGOSTO:8,AUG:8,AUGUST:8,SEP:9,SET:9,SETIEMBRE:9,SEPTIEMBRE:9,SEPT:9,SEPTEMBER:9,OCT:10,OCTUBRE:10,OCTOBER:10,NOV:11,NOVIEMBRE:11,NOVEMBER:11,DIC:12,DICIEMBRE:12,DEC:12,DECEMBER:12};
@@ -406,8 +407,8 @@ function analyzeSheet(aoa, fileYear){
   const H = headers.map(h => h instanceof Date ? "" : norm(h));
   const body = aoa.slice(hr+1).filter(r => r && r.some(c => c!=null && c!==""));
   const pick = (rx, excl) => { const i = H.findIndex(h => h && rx.test(h) && !(excl && excl.test(h))); return i<0 ? -1 : i; };
-  let pdv = H.findIndex(h => /PUNTOS? DE VENTA|PUNTO VENTA/.test(h)); if (pdv<0) pdv = pick(RX.pdv, /COD|ID\b|CODIGO/);
-  const cadena = pick(RX.cadena);
+  let pdv = H.findIndex(h => /PUNTOS? DE VENTA|PUNTO VENTA/.test(h)); if (pdv<0) pdv = H.findIndex(h => /^PDV/.test(h)); if (pdv<0) pdv = pick(RX.pdv, /COD|ID\b|CODIGO/);
+  let cadena = H.findIndex(h => /^CADENA/.test(h)); if (cadena<0) cadena = pick(RX.cadena);
   const fecha = pick(RX.fecha);
   const anio = pick(RX.anio);
   const mes = pick(RX.mes);
@@ -417,15 +418,39 @@ function analyzeSheet(aoa, fileYear){
   // columna de venta: preferir "VENTA", numérica
   const numericShare = i => { let n=0,t=0; for (const r of body.slice(0,200)){ const v=r[i]; if (v==null||v==="") continue; t++; if (num(v)!=null && !(v instanceof Date)) n++; } return t? n/t : 0; };
   let venta = -1, bestS = -1;
-  H.forEach((h,i)=>{ if (!h || i===pdv || i===anio || i===mes || i===fecha) return; if (!RX.venta.test(h) || NOT_VENTA.test(h)) return;
-    let s = numericShare(i); if (/VENTA/.test(h)) s += .5; if (/SOLES|S$|PEN|VALOR|IMPORTE|MONTO/.test(h)) s += .3; if (/TOTAL/.test(h) && !/VENTA/.test(h)) s -= .2;
+  H.forEach((h,i)=>{ if (!h || i===pdv || i===anio || i===mes || i===fecha) return;
+    const precioTot = /^PRECIO TO|PRECIO TOTAL|^P TOTAL|IMPORTE TOTAL/.test(h);
+    if (!precioTot && (!RX.venta.test(h) || NOT_VENTA.test(h))) return;
+    let s = numericShare(i); if (/VENTA/.test(h)) s += .5; if (/SOLES|S$|PEN|VALOR|IMPORTE|MONTO/.test(h)) s += .3; if (/TOTAL/.test(h) && !/VENTA/.test(h) && !precioTot) s -= .2;
+    if (precioTot) s += /CON IGV|C IGV|INC IGV|INCL/.test(h) ? .35 : /SIN IGV|S IGV|NETO/.test(h) ? .15 : .25;
     if (s>bestS){bestS=s; venta=i;} });
   const format = (monthCols.length>=3 && fecha<0 && mes<0) ? "ancho" : "largo";
-  return {hr, headers, H, body, map:{format, pdv, cadena, fecha, anio, mes, venta}, monthCols, fileYear};
+  const marca = H.findIndex(h => /^MARCA/.test(h));
+  const tipo = H.findIndex(h => /^TIPO$|^TIPO /.test(h));
+  return {hr, headers, H, body, map:{format, pdv, cadena, fecha, anio, mes, venta, marca, tipo}, monthCols, fileYear};
 }
 
+function distinctValues(an, col){
+  const cnt = new Map(); if (col<0) return [];
+  for (const r of an.body){ const v = String(r[col] ?? "").trim(); if (!v) continue; cnt.set(v, (cnt.get(v)||0)+1); }
+  return [...cnt.entries()].sort((a,b)=>b[1]-a[1]);
+}
+function defaultSel(an){
+  if (an.marcaSel === undefined){
+    const vals = distinctValues(an, an.map.marca);
+    an.marcaVals = vals;
+    an.marcaSel = an.map.marca>=0 ? new Set(vals.map(v=>v[0]).filter(v => MARCAS_DEFAULT.includes(norm(v)))) : null;
+  }
+  if (an.tipoSel === undefined){
+    const vals = distinctValues(an, an.map.tipo);
+    an.tipoVals = vals;
+    an.tipoSel = an.map.tipo>=0 ? new Set(vals.map(v=>v[0])) : null;
+  }
+}
 function aggregateSheet(an, chainHint){
   const {map, body, monthCols, fileYear} = an;
+  defaultSel(an);
+  const passes = r => (!an.marcaSel || map.marca<0 || an.marcaSel.has(String(r[map.marca] ?? "").trim())) && (!an.tipoSel || map.tipo<0 || an.tipoSel.has(String(r[map.tipo] ?? "").trim()));
   const stores = {}; let rows=0, skipped=0, total=0;
   const add = (pdv, cad, ym, v) => {
     if (v==null || !ym) { skipped++; return; }
@@ -435,15 +460,16 @@ function aggregateSheet(an, chainHint){
   };
   if (map.pdv<0) return {stores, rows, skipped, total, error:"Falta la columna de punto de venta"};
   if (map.format==="ancho"){
-    for (const r of body){ const p = r[map.pdv]; if (p==null||p==="") continue; const cad = map.cadena>=0 ? r[map.cadena] : "";
+    for (const r of body){ const p = r[map.pdv]; if (p==null||p===""||!passes(r)) continue; const cad = map.cadena>=0 ? r[map.cadena] : "";
       for (const mc of monthCols) add(p, cad, mc.ym, num(r[mc.i])); }
   } else {
     if (map.venta<0) return {stores, rows, skipped, total, error:"Falta la columna de venta"};
     if (map.fecha<0 && map.mes<0) return {stores, rows, skipped, total, error:"Falta una columna de fecha o mes"};
     for (const r of body){
-      const p = r[map.pdv]; if (p==null||p==="") continue;
+      const p = r[map.pdv]; if (p==null||p===""||!passes(r)) continue;
       let ym = null;
-      if (map.fecha>=0){ const d = parseYM(r[map.fecha]); if (d && d.y && d.m) ym = ymKey(d.y, d.m); else if (d && d.m && map.anio<0 && fileYear) ym = ymKey(fileYear,d.m); }
+      if (map.anio>=0 && map.mes>=0){ const d = parseYM(r[map.mes]); const a = parseYM(r[map.anio]); const y = (a && a.y) || num(r[map.anio]); if (d && d.m && y) ym = ymKey(y, d.m); }
+      if (!ym && map.fecha>=0){ const d = parseYM(r[map.fecha]); if (d && d.y && d.m) ym = ymKey(d.y, d.m); else if (d && d.m && map.anio<0 && fileYear) ym = ymKey(fileYear,d.m); }
       if (!ym && map.mes>=0){ const d = parseYM(r[map.mes]); let y = d && d.y; if (!y && map.anio>=0){ const a = parseYM(r[map.anio]); y = a && a.y || num(r[map.anio]); } if (!y) y = fileYear; if (d && d.m && y) ym = ymKey(y, d.m); }
       add(p, map.cadena>=0 ? r[map.cadena] : "", ym, num(r[map.venta]));
     }
@@ -503,11 +529,22 @@ function renderPending(){
         h += `<label>Año<select data-f="${fi}" data-s="${si}" data-k="anio">${optionList(sh.an,m.anio)}</select></label>`;
         h += `<label>Mes<select data-f="${fi}" data-s="${si}" data-k="mes">${optionList(sh.an,m.mes)}</select></label>`;
         h += `<label>Venta (S/)<select data-f="${fi}" data-s="${si}" data-k="venta">${optionList(sh.an,m.venta)}</select></label>`;
+        h += `<label>Marca<select data-f="${fi}" data-s="${si}" data-k="marca">${optionList(sh.an,m.marca)}</select></label>`;
+        h += `<label>Tipo<select data-f="${fi}" data-s="${si}" data-k="tipo">${optionList(sh.an,m.tipo)}</select></label>`;
       } else {
         h += `<label>Meses detectados<span class="pill">${sh.an.monthCols.length} columnas</span></label>`;
       }
       if (!sh.an.fileYear && m.format==="largo" && m.fecha<0 && m.anio<0) h += `<label>Año (si falta)<input type="number" data-f="${fi}" data-s="${si}" data-k="fy" placeholder="2026" style="padding:5px 6px;border:1px solid var(--line-2);border-radius:6px"></label>`;
-      h += `</div></div>`;
+      h += `</div>`;
+      const vbox = (title, key, vals, sel) => {
+        if (!vals || !vals.length) return "";
+        let x = `<div style="margin:6px 0 2px;font-size:11px;color:var(--ink-2);font-weight:600">${title}</div><div class="chips">`;
+        vals.slice(0,40).forEach(([v,c],vi)=>{ x += `<label class="chip ${sel.has(v)?"on":""}" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" data-f="${fi}" data-s="${si}" data-k="${key}" data-v="${vi}" ${sel.has(v)?"checked":""} hidden>${esc(v)} <span style="opacity:.6">${fmtN(c)}</span></label>`; });
+        return x + `</div>`;
+      };
+      if (m.format==="largo" && m.marca>=0) h += vbox("Marcas incluidas (por defecto: Paraíso, Krea, Komfort, Viva Home, Casa Joven)", "selM", sh.an.marcaVals, sh.an.marcaSel);
+      if (m.format==="largo" && m.tipo>=0 && sh.an.tipoVals.length>1) h += vbox("Tipo incluido", "selT", sh.an.tipoVals, sh.an.tipoSel);
+      h += `</div>`;
     });
     h += `</div>`;
   });
@@ -518,7 +555,8 @@ function renderPending(){
     if (k==="include") sh.include = el.checked;
     else if (k==="format") sh.an.map.format = el.value;
     else if (k==="fy"){ sh.an.fileYear = +el.value || null; }
-    else sh.an.map[k] = +el.value;
+    else if (k==="selM" || k==="selT"){ const vals = k==="selM" ? sh.an.marcaVals : sh.an.tipoVals; const set = k==="selM" ? sh.an.marcaSel : sh.an.tipoSel; const v = vals[+el.dataset.v][0]; el.checked ? set.add(v) : set.delete(v); }
+    else { sh.an.map[k] = +el.value; if (k==="marca") delete sh.an.marcaSel; if (k==="tipo") delete sh.an.tipoSel; }
     renderPending();
   }));
   $("btnAdd").onclick = commitPending;
