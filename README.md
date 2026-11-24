@@ -9,6 +9,8 @@ Dashboard web del reporte 30K de la cuenta Paraíso (Below Trade): venta mensual
 3. Pulsa **Agregar al reporte**. Los datos se procesan en el navegador y quedan guardados en ese navegador (localStorage); no se envían a ningún servidor.
 
 ## Ventas de competencia
+Al subir un archivo se elige **«Todas las marcas»** (grupo Paraíso + competencia) o **«Solo marcas Paraíso»** (Paraíso, Krea, Komfort, Viva Home, Casa Joven; el resto no se guarda). La elección queda registrada en la lista de archivos.
+
 Las filas cuya MARCA no pertenece al grupo Paraíso (Paraíso, Casa Joven, Viva Home, Krea, Komfort) se guardan como **venta de competencia**. El selector «Ventas de» cambia la tabla entre el grupo Paraíso y la competencia. Las alertas (< a 30K y promotoría) siempre usan la venta Paraíso.
 
 ## Descargas

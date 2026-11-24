@@ -289,6 +289,7 @@ let estructura = ESTRUCTURA_BASE.slice();
 let estrSource = "base";
 let fileData = {};          // id -> {name, uploadedAt, stores:{key:{p,c,m:{ym:v}}}}
 let pending = null;          // archivos en revisión
+let loadMode = (()=>{ try{ return localStorage.getItem("r30k_mode") || "todas"; }catch(e){ return "todas"; } })(); // "todas" | "paraiso"
 let db = null, downloads = null;
 const ui = {chains:new Set(), sortKey:null, sortDir:-1};
 
@@ -319,7 +320,7 @@ async function persistFile(id){
       const keep = new Set(Object.keys(byYear).map(y=>id+"__"+y));
       for (const d of prev.docs) if (!keep.has(d.id)) await db.collection("ventas").doc(d.id).delete();
       for (const [y,stores] of Object.entries(byYear)){
-        await db.collection("ventas").doc(id+"__"+y).set({file:id, name:f.name, uploadedAt:f.uploadedAt, v:f.v||1, year:y, stores});
+        await db.collection("ventas").doc(id+"__"+y).set({file:id, name:f.name, uploadedAt:f.uploadedAt, v:f.v||1, modo:f.modo||"todas", year:y, stores});
       }
       return true;
     }catch(e){ console.warn(e); toast("No se pudo guardar en la nube ("+(e.code||"error")+"); queda guardado en este navegador."); }
@@ -348,7 +349,7 @@ async function loadPersisted(){
       const fd = {};
       for (const d of snap.docs){
         const x = d.data(); const id = x.file;
-        fd[id] ||= {name:x.name, uploadedAt:x.uploadedAt, v:x.v||1, stores:{}};
+        fd[id] ||= {name:x.name, uploadedAt:x.uploadedAt, v:x.v||1, modo:x.modo||"todas", stores:{}};
         for (const [k,s] of Object.entries(x.stores||{})){
           const t = (fd[id].stores[k] ||= {p:s.p, c:s.c, m:{}});
           Object.assign(t.m, s.m);
@@ -510,7 +511,9 @@ function aggregateSheet(an, chainHint){
       if (!inSel(an.tipoSel, map.tipo, r)){ dg.tipo++; excl++; continue; }
       if (!inSel(an.marcaSel, map.marca, r)){
         // marca fuera del grupo Paraíso -> venta de competencia
-        dg.marca++; const vc = num(r[map.venta]); if (vc!=null && ym) dg.vc = (dg.vc||0) + vc;
+        dg.marca++;
+        if (loadMode === "paraiso"){ excl++; continue; }
+        const vc = num(r[map.venta]); if (vc!=null && ym) dg.vc = (dg.vc||0) + vc;
         add(p, map.cadena>=0 ? r[map.cadena] : "", ym, vc, true); continue;
       }
       const v = num(r[map.venta]);
@@ -594,7 +597,15 @@ function optionList(an, sel, allowNone=true){
 function renderPending(){
   const box = $("previewVentas");
   if (!pending || !pending.length){ box.innerHTML = ""; return; }
-  let h = `<div class="preview"><h3>Revisa el mapeo antes de agregar</h3>`;
+  let h = `<div class="preview"><h3>Revisa el mapeo antes de agregar</h3>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;padding:10px;border-radius:8px;background:var(--surface);border:1px solid var(--line)">
+      <b style="font-size:12px">¿Qué marcas cargar?</b>
+      <div class="chips" role="radiogroup">
+        <button type="button" class="chip ${loadMode==="todas"?"on":""}" data-mode="todas" role="radio" aria-checked="${loadMode==="todas"}">Todas las marcas</button>
+        <button type="button" class="chip ${loadMode==="paraiso"?"on":""}" data-mode="paraiso" role="radio" aria-checked="${loadMode==="paraiso"}">Solo marcas Paraíso</button>
+      </div>
+      <span class="note">${loadMode==="todas" ? "Grupo Paraíso + competencia (El Cisne, Rosen, Forli, Drimer, etc.). La competencia se ve con «Ventas de: Competencia»." : "Solo Paraíso, Krea, Komfort, Viva Home y Casa Joven. Las demás marcas no se guardan."}</span>
+    </div>`;
   pending.forEach((pf,fi)=>{
     h += `<div style="margin-top:8px"><b>${esc(pf.file.name)}</b>`;
     if (pf.error){ h += ` <span class="pill bad">${esc(pf.error)}</span></div>`; return; }
@@ -668,6 +679,7 @@ function renderPending(){
     renderPending();
   }));
   $("btnAdd").onclick = commitPending;
+  box.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { loadMode = b.dataset.mode; try{ localStorage.setItem("r30k_mode", loadMode); }catch(e){} renderPending(); });
   $("btnCancel").onclick = () => { pending = null; renderPending(); };
 }
 
@@ -687,7 +699,7 @@ async function commitPending(){
     }
     if (!Object.keys(stores).length) continue;
     const id = docId(pf.file.name);
-    fileData[id] = {name:pf.file.name, uploadedAt:new Date().toISOString(), v:2, stores};
+    fileData[id] = {name:pf.file.name, uploadedAt:new Date().toISOString(), v:2, modo:loadMode, stores};
     await persistFile(id); added++;
   }
   pending = null; renderPending(); renderAll();
@@ -784,7 +796,7 @@ function renderAll(){
   $("filesList").innerHTML = fl.map(([id,f])=>{
     const yms = new Set(); Object.values(f.stores).forEach(s=>Object.keys(s.m).forEach(k=>yms.add(k))); const ys=[...yms].sort();
     const tot = Object.values(f.stores).reduce((a,s)=>a+Object.values(s.m).reduce((x,y)=>x+y,0),0);
-    return `<div class="file"><span>📄</span><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span><span class="mt">${Object.keys(f.stores).length} PDV · ${ys.length?ymLabel(ys[0])+"–"+ymLabel(ys[ys.length-1]):""} · ${fmtS(tot)}</span><button class="btn sm" data-del="${esc(id)}">Quitar</button></div>`;
+    return `<div class="file"><span>📄</span><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>${(f.v||1)>=2 ? `<span class="pill ${f.modo==="paraiso"?"":"ok"}">${f.modo==="paraiso"?"Solo marcas Paraíso":"Todas las marcas"}</span>` : ""}<span class="mt">${Object.keys(f.stores).length} PDV · ${ys.length?ymLabel(ys[0])+"–"+ymLabel(ys[ys.length-1]):""} · ${fmtS(tot)}</span><button class="btn sm" data-del="${esc(id)}">Quitar</button></div>`;
   }).join("");
   $("filesList").querySelectorAll("[data-del]").forEach(b => b.onclick = () => removeFile(b.dataset.del));
   // estructura
