@@ -213,6 +213,7 @@ const ESTRUCTURA_BASE = [{"c":"Plaza Vea","p":"PLAZA VEA CAJAMARCA CAJAMARCA","g
 const BRANDS = ["PARAISO","EL CISNE","FORLI","ROSEN","DRIMER","DROM","SIMONS","TECHNODREAM","RIZZOLI","SERTA"];
 const BRAND_LABEL = {"PARAISO":"Paraíso","EL CISNE":"El Cisne","FORLI":"Forli","ROSEN":"Rosen","DRIMER":"Drimer","DROM":"Drom","SIMONS":"Simmons","TECHNODREAM":"Technodream","RIZZOLI":"Rizzoli","SERTA":"Serta"};
 const MARCAS_DEFAULT = ["PARAISO","KREA","KOMFORT","VIVA HOME","VIVAHOME","CASA JOVEN","CASAJOVEN"];
+const isOwnBrand = v => MARCAS_DEFAULT.includes(norm(v));
 const CHAIN_ORDER = ["Conecta","Estilos","Falabella","Hiraoka","Metro","Oechsle","Plaza Vea","Ripley","Sodimac","Tottus"];
 const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const MONTHS = {ENE:1,ENERO:1,JAN:1,JANUARY:1,FEB:2,FEBRERO:2,FEBRUARY:2,MAR:3,MARZO:3,MARCH:3,ABR:4,ABRIL:4,APR:4,APRIL:4,MAY:5,MAYO:5,JUN:6,JUNIO:6,JUNE:6,JUL:7,JULIO:7,JULY:7,AGO:8,AGOSTO:8,AUG:8,AUGUST:8,SEP:9,SET:9,SETIEMBRE:9,SEPTIEMBRE:9,SEPT:9,SEPTEMBER:9,OCT:10,OCTUBRE:10,OCTOBER:10,NOV:11,NOVIEMBRE:11,NOVEMBER:11,DIC:12,DICIEMBRE:12,DEC:12,DECEMBER:12};
@@ -452,7 +453,7 @@ function defaultSel(an){
   if (an.marcaSel === undefined){
     const vals = distinctValues(an, an.map.marca);
     an.marcaVals = vals;
-    an.marcaSel = an.map.marca>=0 ? new Set(vals.map(v=>v[0]).filter(v => MARCAS_DEFAULT.includes(norm(v)))) : null;
+    an.marcaSel = an.map.marca>=0 ? new Set(vals.map(v=>v[0]).filter(v => loadMode==="todas" || isOwnBrand(v))) : null;
   }
   if (an.cobSel === undefined){
     const vals = distinctValues(an, an.map.cobertura);
@@ -509,10 +510,10 @@ function aggregateSheet(an, chainHint){
       if (p==null || String(p).trim()===""){ dg.noPdv++; continue; }
       if (!inSel(an.cobSel, map.cobertura, r)){ dg.cob++; excl++; continue; }
       if (!inSel(an.tipoSel, map.tipo, r)){ dg.tipo++; excl++; continue; }
-      if (!inSel(an.marcaSel, map.marca, r)){
-        // marca fuera del grupo Paraíso -> venta de competencia
-        dg.marca++;
-        if (loadMode === "paraiso"){ excl++; continue; }
+      if (!inSel(an.marcaSel, map.marca, r)){ dg.marca++; excl++; continue; }   // marca no seleccionada: no se carga
+      if (map.marca>=0 && !isOwnBrand(r[map.marca])){
+        // marca seleccionada fuera del grupo Paraíso -> venta de competencia
+        dg.nc = (dg.nc||0) + 1;
         const vc = num(r[map.venta]); if (vc!=null && ym) dg.vc = (dg.vc||0) + vc;
         add(p, map.cadena>=0 ? r[map.cadena] : "", ym, vc, true); continue;
       }
@@ -604,7 +605,7 @@ function renderPending(){
         <button type="button" class="chip ${loadMode==="todas"?"on":""}" data-mode="todas" role="radio" aria-checked="${loadMode==="todas"}">Todas las marcas</button>
         <button type="button" class="chip ${loadMode==="paraiso"?"on":""}" data-mode="paraiso" role="radio" aria-checked="${loadMode==="paraiso"}">Solo marcas Paraíso</button>
       </div>
-      <span class="note">${loadMode==="todas" ? "Grupo Paraíso + competencia (El Cisne, Rosen, Forli, Drimer, etc.). La competencia se ve con «Ventas de: Competencia»." : "Solo Paraíso, Krea, Komfort, Viva Home y Casa Joven. Las demás marcas no se guardan."}</span>
+      <span class="note">${loadMode==="todas" ? "Se marcan todas las marcas del archivo. Las del grupo Paraíso suman a la venta Paraíso; el resto se guarda como competencia («Ventas de: Competencia»)." : "Solo se marcan Paraíso, Krea, Komfort, Viva Home y Casa Joven. Las demás marcas no se guardan."}</span>
     </div>`;
   pending.forEach((pf,fi)=>{
     h += `<div style="margin-top:8px"><b>${esc(pf.file.name)}</b>`;
@@ -629,8 +630,8 @@ function renderPending(){
       }
       if (agg.diag && Object.keys(agg.diag).length){
         const ks = Object.keys(agg.diag).sort();
-        h += `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600">Desglose por mes: filas leídas y por qué se descartan (${fmtN(agg.nBody)} filas en la hoja)</summary><div style="overflow:auto"><table class="chainsum" style="font-size:11px;margin-top:6px"><thead><tr><th>Mes</th><th>Filas</th><th>Sin PDV</th><th>Competencia</th><th>Monto competencia</th><th>No coberturado</th><th>Otro tipo</th><th>Sin monto</th><th>Sumadas</th><th>Monto</th></tr></thead><tbody>` +
-          ks.map(k => { const d = agg.diag[k]; return `<tr><td><b>${k==="?"?"Sin mes":ymLabel(k)}</b></td><td>${fmtN(d.tot)}</td><td>${fmtN(d.noPdv)}</td><td>${fmtN(d.marca)}</td><td>${fmtS(d.vc||0)}</td><td>${fmtN(d.cob)}</td><td>${fmtN(d.tipo)}</td><td>${fmtN(d.noVal)}</td><td>${fmtN(d.ok)}</td><td>${fmtS(d.v)}</td></tr>`; }).join("") + `</tbody></table></div></details>`;
+        h += `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600">Desglose por mes: filas leídas y por qué se descartan (${fmtN(agg.nBody)} filas en la hoja)</summary><div style="overflow:auto"><table class="chainsum" style="font-size:11px;margin-top:6px"><thead><tr><th>Mes</th><th>Filas</th><th>Sin PDV</th><th>Marca no cargada</th><th>Filas competencia</th><th>Monto competencia</th><th>No coberturado</th><th>Otro tipo</th><th>Sin monto</th><th>Sumadas</th><th>Monto</th></tr></thead><tbody>` +
+          ks.map(k => { const d = agg.diag[k]; return `<tr><td><b>${k==="?"?"Sin mes":ymLabel(k)}</b></td><td>${fmtN(d.tot)}</td><td>${fmtN(d.noPdv)}</td><td>${fmtN(d.marca)}</td><td>${fmtN(d.nc||0)}</td><td>${fmtS(d.vc||0)}</td><td>${fmtN(d.cob)}</td><td>${fmtN(d.tipo)}</td><td>${fmtN(d.noVal)}</td><td>${fmtN(d.ok)}</td><td>${fmtS(d.v)}</td></tr>`; }).join("") + `</tbody></table></div></details>`;
       }
       if (agg.badDate && agg.badDate.size){
         h += `<div class="msg err">Valores de MES | AÑO | FECHA que no se pudieron leer: ` + [...agg.badDate.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([v,c])=>`<b>${esc(v)}</b> (${fmtN(c)})`).join(", ") + `</div>`;
@@ -659,7 +660,15 @@ function renderPending(){
         vals.slice(0,40).forEach(([v,c],vi)=>{ x += `<label class="chip ${sel.has(v)?"on":""}" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" data-f="${fi}" data-s="${si}" data-k="${key}" data-v="${vi}" ${sel.has(v)?"checked":""} hidden>${esc(v)} <span style="opacity:.6">${fmtN(c)}</span></label>`; });
         return x + `</div>`;
       };
-      if (m.format==="largo" && m.marca>=0) h += vbox("Marcas del grupo Paraíso (por defecto: Paraíso, Krea, Komfort, Viva Home, Casa Joven) — las no marcadas van a «Competencia»", "selM", sh.an.marcaVals, sh.an.marcaSel);
+      if (m.format==="largo" && m.marca>=0){
+        const all = sh.an.marcaVals.map((x,i)=>[x,i]);
+        const chip = ([[v,c],vi]) => `<label class="chip ${sh.an.marcaSel.has(v)?"on":""}" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" data-f="${fi}" data-s="${si}" data-k="selM" data-v="${vi}" ${sh.an.marcaSel.has(v)?"checked":""} hidden>${sh.an.marcaSel.has(v)?"✓ ":""}${esc(v)} <span style="opacity:.6">${fmtN(c)}</span></label>`;
+        const own = all.filter(([[v]])=>isOwnBrand(v)), comp = all.filter(([[v]])=>!isOwnBrand(v));
+        const nSel = sh.an.marcaSel.size;
+        h += `<div style="margin:8px 0 2px;font-size:11px;color:var(--ink-2);font-weight:600">Marcas a cargar: ${nSel} de ${all.length} seleccionadas (clic para marcar o desmarcar)</div>`;
+        if (own.length) h += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px"><span class="pill ok" style="min-width:110px;justify-content:center">Grupo Paraíso</span><div class="chips">${own.map(chip).join("")}</div></div>`;
+        if (comp.length) h += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"><span class="pill" style="min-width:110px;justify-content:center">Competencia</span><div class="chips">${comp.map(chip).join("")}</div></div>`;
+      }
       if (m.format==="largo" && m.cobertura>=0) h += vbox("Cobertura incluida (por defecto: COBERTURADO y COBERTURADOS)", "selC", sh.an.cobVals, sh.an.cobSel);
       if (m.format==="largo" && m.tipo>=0 && sh.an.tipoVals.length>1) h += vbox("Tipo incluido", "selT", sh.an.tipoVals, sh.an.tipoSel);
       h += `</div>`;
@@ -679,7 +688,10 @@ function renderPending(){
     renderPending();
   }));
   $("btnAdd").onclick = commitPending;
-  box.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { loadMode = b.dataset.mode; try{ localStorage.setItem("r30k_mode", loadMode); }catch(e){} renderPending(); });
+  box.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => {
+    loadMode = b.dataset.mode; try{ localStorage.setItem("r30k_mode", loadMode); }catch(e){}
+    for (const pf of pending) for (const sh of (pf.sheets||[])) if (sh.an && sh.an.marcaVals && sh.an.map.marca>=0) sh.an.marcaSel = new Set(sh.an.marcaVals.map(v=>v[0]).filter(v => loadMode==="todas" || isOwnBrand(v)));
+    renderPending(); });
   $("btnCancel").onclick = () => { pending = null; renderPending(); };
 }
 
