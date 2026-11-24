@@ -10,6 +10,13 @@ Dashboard web del reporte 30K de la cuenta Paraíso (Below Trade): venta mensual
 
 Ver el reporte es libre. Para subir, reemplazar o quitar archivos hay que entrar en **🔒 Editar** con la contraseña del servidor (variable `UPLOAD_PASSWORD`).
 
+## Radar de tiendas críticas
+Panel superior para evaluar tiendas críticas (año de referencia, venta Paraíso):
+- Cifras clave: tiendas bajo el umbral, brecha mensual para llegar a 30K, «zona roja» (bajo 30K + alerta de promotoría) y participación Paraíso.
+- Semáforo: Crítica (< 50% del umbral), En riesgo (50–100%), Saludable (≥ umbral), Sin venta.
+- Gráficos: tiendas bajo 30K mes a mes (mes en curso rayado), venta Paraíso vs competencia, cadenas por estado y cuadrante venta vs participación.
+- Top 15 tiendas más críticas con avance al umbral, tendencia, promotores y alertas; clic para ver la tienda en la tabla.
+
 ## Ventas de competencia
 Al subir un archivo se elige **«Todas las marcas»** (grupo Paraíso + competencia) o **«Solo marcas Paraíso»** (Paraíso, Krea, Komfort, Viva Home, Casa Joven; el resto no se guarda). La elección queda registrada en la lista de archivos.
 
