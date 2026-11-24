@@ -8,10 +8,17 @@ Dashboard web del reporte 30K de la cuenta Paraíso (Below Trade): venta mensual
    Por defecto solo suma las marcas Paraíso, Krea, Komfort, Viva Home y Casa Joven (columna MARCA) y solo las filas COBERTURADO o COBERTURADOS (columna COBERTURA); se puede cambiar en la revisión.
 3. Pulsa **Agregar al reporte**. El Excel se procesa en el navegador y solo se envía al servidor el resumen por tienda y mes, que queda guardado en Postgres: todos los que abren el sitio ven lo mismo.
 
-Ver el reporte es libre. Para subir, reemplazar o quitar archivos hay que entrar en **🔒 Editar** con la contraseña del servidor (variable `UPLOAD_PASSWORD`).
+Para entrar se inicia sesión con **DNI y contraseña**. Lo que cada persona ve y puede hacer depende de su perfil (ver «Usuarios y perfiles»).
+
+## Usuarios y perfiles
+- **Usuarios**: crear, editar (nombre, perfil, estado, nueva contraseña), desactivar y eliminar. El DNI es el usuario de acceso; contraseña mínima 8 caracteres, guardada cifrada (scrypt).
+- **Perfiles**: ADMIN_SUPER (todo, fijo), ANALISTA (ver, descargar y subir datos), GERENCIA (ver y descargar). Se pueden editar permisos y crear perfiles nuevos.
+- Permisos: ver radar, ver detalle, descargar, subir/quitar datos, gestionar usuarios, gestionar perfiles. El servidor los valida en cada llamada.
+- **Primer administrador**: si no hay usuarios, la pantalla de acceso pide crear el ADMIN_SUPER con la clave de instalación (`UPLOAD_PASSWORD`).
+- Siempre queda al menos un ADMIN_SUPER activo. Las sesiones duran 12 horas; desactivar un usuario o cambiarle la contraseña cierra sus sesiones.
 
 ## Módulos
-La página tiene tres pestañas (enlazables con `#radar`, `#detalle-30k`, `#datos`):
+La página tiene pestañas según el perfil (enlazables con `#radar`, `#detalle-30k`, `#datos`, `#usuarios`, `#perfiles`):
 - **Radar de tiendas críticas** (portada).
 - **Detalle a 30K**: indicadores, resumen por cadena, filtros, tabla por punto de venta y descargas.
 - **Datos del reporte**: carga de archivos de venta y de estructura.
@@ -45,7 +52,7 @@ Las filas cuya MARCA no pertenece al grupo Paraíso (Paraíso, Casa Joven, Viva 
 - **Sitio** `reporte-30k-paraiso` (estático, publish path `public`): https://reporte-30k-paraiso.onrender.com
 - **Servidor** `reporte-30k-paraiso-api` (Node, `node server.js`): API `/api/*` y la misma página. Variables de entorno:
   - `DATABASE_URL`: *Internal Database URL* de la base Postgres (tablas `r30k_files` y `r30k_config`, se crean solas).
-  - `UPLOAD_PASSWORD`: contraseña para subir/quitar.
+  - `UPLOAD_PASSWORD`: clave de instalación para crear el primer ADMIN_SUPER.
   - `ALLOWED_ORIGINS` (opcional): orígenes permitidos; por defecto el sitio estático.
 
 ## Alertas

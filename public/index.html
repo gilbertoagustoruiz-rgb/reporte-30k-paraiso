@@ -131,6 +131,45 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
 .toast.show{opacity:1}
 .tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--surface);font-size:11px;padding:6px 8px;border-radius:6px;z-index:60;display:none;max-width:260px}
 
+/* ===== Acceso ===== */
+body.locked .tabs, body.locked .wrap, body.locked #btnUploadTop{display:none!important}
+#loginView{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:radial-gradient(900px 500px at 80% -10%,rgba(208,59,59,.45),transparent 60%),radial-gradient(800px 500px at -10% 110%,rgba(42,120,214,.45),transparent 60%),linear-gradient(135deg,#0b1f38,#13253f 55%,#1d1420)}
+#loginView[hidden]{display:none}
+.lg-card{width:min(400px,100%);background:var(--surface);color:var(--ink);border-radius:16px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.lg-brand{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--crit)}
+.lg-card h2{margin:10px 0 2px;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.lg-sub{margin:0 0 16px;color:var(--ink-2);font-size:13px}
+.lg-card form{display:flex;flex-direction:column;gap:12px}
+.lg-card label,.fm label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.lg-card input,.fm input,.fm select,.fm textarea{padding:9px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:14px;font-weight:400}
+.lg-card small{font-weight:400;color:var(--ink-3)}
+.userchip{display:inline-flex;align-items:center;gap:8px;color:#fff;font-size:12px}
+.userchip .av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.15);font-weight:800}
+.userchip small{display:block;opacity:.7;font-size:10px;letter-spacing:.06em}
+#modal{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:20px}
+#modal[hidden]{display:none}
+.md-card{width:min(460px,100%);background:var(--surface);border-radius:14px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.md-card h3{margin:0 0 12px;font-size:17px}
+/* ===== Usuarios y perfiles ===== */
+.fm{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end}
+.fm .act{display:flex;gap:8px}
+.fm label{min-width:0}
+.fm label > div{min-width:0}
+.ut{width:100%;border-collapse:collapse;font-size:13px}
+.ut th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+.ut td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.ut tr.edit td{background:var(--surface-2)}
+.pf{display:inline-flex;font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.pf.ADMIN_SUPER{background:#2b1220;color:#ff9db5}
+.pf.GERENCIA{background:#10281a;color:#5fd38a}
+.st-on{color:var(--good);font-weight:700}.st-off{color:var(--ink-3);font-weight:700}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:14px}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.pcard h3{margin:0;font-size:16px;display:flex;align-items:center;gap:8px}
+.perm{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 8px;border-radius:8px;background:var(--surface-2)}
+.perm input{width:16px;height:16px}
+.btn.danger{border-color:var(--crit);color:var(--crit)}
+
 /* ===== Módulos (pestañas) ===== */
 .tabs{position:sticky;top:0;z-index:20;display:flex;gap:4px;padding:0 20px;background:var(--brand);border-top:1px solid rgba(255,255,255,.08);overflow-x:auto}
 .tab{appearance:none;border:0;background:transparent;color:rgba(255,255,255,.7);font-weight:600;font-size:13px;padding:11px 14px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
@@ -215,6 +254,8 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
   <button class="tab" role="tab" data-tab="radar">◉ Radar de tiendas críticas <span class="cnt" id="tabCnt" hidden></span></button>
   <button class="tab" role="tab" data-tab="detalle-30k">▤ Detalle a 30K</button>
   <button class="tab" role="tab" data-tab="datos">⬆ Datos del reporte</button>
+  <button class="tab" role="tab" data-tab="usuarios" hidden>👥 Usuarios</button>
+  <button class="tab" role="tab" data-tab="perfiles" hidden>🛡 Perfiles</button>
 </nav>
 
 <div class="wrap">
@@ -297,7 +338,60 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
   <div class="tblwrap"><table class="rep" id="rep"></table></div>
   <p class="note" style="margin-top:10px" id="noteFoot">Promedio = total del año ÷ meses con venta registrada. «&lt; a 30K»: el promedio del año de referencia está bajo el umbral. «Alertas + Promotoría»: ALERTA si alguna marca de la competencia (El Cisne, Drimer, Forli, Rosen, Drom, Simmons, Technodream, Serta o Rizzoli) tiene más promotores que Paraíso en la tienda. Celdas en amarillo = promedio bajo el umbral.</p>
   </div>
+
+  <div class="tabpane" data-pane="usuarios" hidden>
+    <div class="pane-head"><h2>Usuarios</h2><p>Crea y administra quién entra al reporte y con qué perfil.</p></div>
+    <section class="card">
+      <h2>Nuevo usuario</h2>
+      <p class="hint">El DNI es el usuario para iniciar sesión. La contraseña debe tener al menos 8 caracteres.</p>
+      <form class="fm" id="uForm" autocomplete="off">
+        <label>Nombre<input id="uNom" maxlength="120" required placeholder="Nombres y apellidos"></label>
+        <label>DNI<input id="uDni" maxlength="12" inputmode="numeric" required placeholder="8 dígitos"></label>
+        <label>Contraseña<div style="display:flex;gap:6px"><input id="uPwd" type="password" minlength="8" required autocomplete="new-password" style="flex:1;min-width:0"><button type="button" class="btn sm" id="uGen" title="Generar contraseña segura">🎲</button><button type="button" class="btn sm" id="uEye" title="Mostrar">👁</button></div></label>
+        <label>Perfil<select id="uPerf"></select></label>
+        <div class="act"><button class="btn primary" type="submit">+ Crear usuario</button></div>
+      </form>
+      <div class="msg err" id="uErr" hidden></div>
+    </section>
+    <section class="card">
+      <h2 id="uCount">Usuarios</h2>
+      <div style="overflow:auto"><table class="ut" id="uTbl"></table></div>
+    </section>
+  </div>
+
+  <div class="tabpane" data-pane="perfiles" hidden>
+    <div class="pane-head"><h2>Perfiles</h2><p>Define qué puede ver y hacer cada perfil. ADMIN_SUPER siempre tiene todos los permisos.</p></div>
+    <div class="pgrid" id="pGrid"></div>
+    <section class="card">
+      <h2>Nuevo perfil</h2>
+      <form class="fm" id="pForm" autocomplete="off">
+        <label>Nombre<input id="pNom" maxlength="30" required placeholder="EJ. SUPERVISOR" style="text-transform:uppercase"></label>
+        <label style="grid-column:span 2">Descripción<input id="pDesc" maxlength="200" placeholder="Para qué sirve este perfil"></label>
+        <div class="act"><button class="btn primary" type="submit">+ Crear perfil</button></div>
+      </form>
+      <div id="pNewPerms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-top:12px"></div>
+      <div class="msg err" id="pErr" hidden></div>
+    </section>
+  </div>
 </div>
+
+<div id="loginView" hidden>
+  <div class="lg-card">
+    <div class="lg-brand"><span class="rd-dot"></span> Reporte 30K Paraíso</div>
+    <h2 id="lgTitle">Inicia sesión</h2>
+    <p class="lg-sub" id="lgSub">Ingresa con tu DNI y contraseña.</p>
+    <form id="lgForm" autocomplete="on">
+      <label id="lgNomRow" hidden>Nombre completo<input id="lgNom" autocomplete="name" maxlength="120"></label>
+      <label>DNI<input id="lgDni" inputmode="numeric" autocomplete="username" maxlength="12" required></label>
+      <label>Contraseña<input id="lgPwd" type="password" autocomplete="current-password" required minlength="8"></label>
+      <label id="lgKeyRow" hidden>Clave de instalación<input id="lgKey" type="password" autocomplete="off"><small>Es el valor de <code>UPLOAD_PASSWORD</code> en Render (servicio reporte-30k-paraiso-api → Environment).</small></label>
+      <div class="msg err" id="lgErr" hidden></div>
+      <button class="btn primary" type="submit" id="lgBtn" style="justify-content:center;padding:10px">Ingresar</button>
+    </form>
+  </div>
+</div>
+
+<div id="modal" hidden><div class="md-card" role="dialog" aria-modal="true"><div id="mdBody"></div></div></div>
 
 <div class="toast" id="toast"></div>
 <div class="tip" id="tip"></div>
@@ -404,23 +498,25 @@ const API_BASE = (() => {
   if (/^(localhost|127\.0\.0\.1)$/.test(h) && location.port) return "";
   return null;                                                         // claude.ai u otro: sin servidor
 })();
-let serverMode = false, serverKey = null, serverDown = false;
-try{ serverKey = sessionStorage.getItem("r30k_key"); }catch(e){}
+let serverMode = false, serverDown = false, authToken = null, me = null;
+try{ authToken = localStorage.getItem("r30k_token"); }catch(e){}
+function setToken(t){ authToken = t; try{ t ? localStorage.setItem("r30k_token", t) : localStorage.removeItem("r30k_token"); }catch(e){} }
 async function api(path, opts={}, timeoutMs=90000){
   const ctl = new AbortController(); const tm = setTimeout(()=>ctl.abort(), timeoutMs);
   try{
-    const headers = {"Content-Type":"application/json"}; if (serverKey) headers["X-Upload-Key"] = serverKey;
+    const headers = {"Content-Type":"application/json"}; if (authToken) headers["Authorization"] = "Bearer " + authToken;
     const r = await fetch(API_BASE + path, {...opts, headers:{...headers, ...(opts.headers||{})}, signal:ctl.signal});
     const body = await r.json().catch(()=>({}));
     if (!r.ok){ const e = new Error(body.error || ("HTTP "+r.status)); e.status = r.status; throw e; }
     return body;
   } finally { clearTimeout(tm); }
 }
-const canEdit = () => !serverMode || !!serverKey;
+const perm = p => !serverMode || !!(me && me.permisos && me.permisos[p]);
+const canEdit = () => perm("subir_datos");
 function serverFail(e, what){
   console.warn(e);
-  if (e && e.status===401){ serverKey = null; try{ sessionStorage.removeItem("r30k_key"); }catch(_){} renderAccess(); toast("Contraseña inválida o vencida: vuelve a entrar en modo edición."); }
-  else toast(`No se pudo ${what} en el servidor (${e && e.message || "error"}).`);
+  if (e && e.status===401){ toast("Tu sesión venció: vuelve a iniciar sesión."); logout(true); }
+  else toast(`No se pudo ${what} (${e && e.message || "error"}).`);
 }
 
 async function persistFile(id){
@@ -481,16 +577,25 @@ async function persistEstr(){
   if (db){ try{ if (estrSource==="base") await db.doc("config/estructura").delete(); else await db.doc("config/estructura").set(payload); return; }catch(e){console.warn(e);} }
   lsSet("r30k_estr", estrSource==="base" ? null : payload);
 }
+async function loadServerData(){
+  fileData = {}; estructura = ESTRUCTURA_BASE.slice(); estrSource = "base";
+  if (!(perm("ver_radar") || perm("ver_detalle") || perm("subir_datos"))) return;
+  try{
+    const d = await api("/api/data", {}, 120000);
+    for (const f of d.files || []) fileData[f.id] = {name:f.name, uploadedAt:f.uploadedAt, v:f.v||1, modo:f.modo||"todas", by:f.by, stores:f.stores||{}};
+    if (d.estructura && d.estructura.rows){ estructura = d.estructura.rows; estrSource = d.estructura.source; }
+  }catch(e){ serverFail(e, "cargar los datos"); }
+}
 async function loadPersisted(){
   if (API_BASE !== null){
     setServerStatus("Conectando con el servidor… (si estuvo inactivo puede tardar ~1 minuto en despertar)");
     try{
-      const d = await api("/api/data", {}, 120000);
+      const st = await api("/api/auth/status", {}, 120000);
       serverMode = true; serverDown = false;
-      fileData = {}; for (const f of d.files || []) fileData[f.id] = {name:f.name, uploadedAt:f.uploadedAt, v:f.v||1, modo:f.modo||"todas", stores:f.stores||{}};
-      if (d.estructura && d.estructura.rows){ estructura = d.estructura.rows; estrSource = d.estructura.source; }
-      if (serverKey){ try{ await api("/api/login", {method:"POST", body: JSON.stringify({key: serverKey})}); } catch(e){ serverKey = null; try{ sessionStorage.removeItem("r30k_key"); }catch(_){} } }
+      if (authToken){ try{ me = (await api("/api/auth/me")).user; }catch(e){ me = null; setToken(null); } }
       setServerStatus("");
+      if (!me){ showLogin(st.hasUsers); return; }
+      await loadServerData();
       return;
     }catch(e){
       console.warn(e); serverDown = true;
@@ -1427,24 +1532,18 @@ function renderAccess(){
   document.querySelectorAll("#dropVentas,#dropEstr").forEach(z => { z.style.opacity = lock ? .55 : 1; z.style.pointerEvents = lock ? "none" : ""; });
   document.querySelectorAll("[data-del],#btnEstrReset").forEach(b => b.hidden = lock);
   $("btnUploadTop").hidden = lock;
-  if (!serverMode){ box.innerHTML = ""; return; }
-  if (serverKey){
-    box.innerHTML = `<span class="pill ok">✎ Modo edición</span><button class="btn ghost sm" id="btnLogout">Salir</button>`;
-    $("btnLogout").onclick = () => { serverKey = null; try{ sessionStorage.removeItem("r30k_key"); }catch(e){} renderAccess(); renderAll(); };
-  } else {
-    box.innerHTML = `<form id="loginForm" style="display:flex;gap:6px;align-items:center"><input type="password" id="loginPwd" placeholder="Contraseña para subir" autocomplete="current-password" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;width:170px"><button class="btn ghost sm" type="submit">🔒 Editar</button></form>`;
-    $("loginForm").onsubmit = async (ev) => {
-      ev.preventDefault(); const k = $("loginPwd").value; if (!k) return;
-      try{ serverKey = k; await api("/api/login", {method:"POST", body: JSON.stringify({key:k})}); try{ sessionStorage.setItem("r30k_key", k); }catch(e){} toast("Modo edición activado"); renderAccess(); renderAll(); }
-      catch(e){ serverKey = null; toast(e.status===401 ? "Contraseña incorrecta" : ("No se pudo validar: " + e.message)); }
-    };
-  }
+  applyPerms();
+  if (!serverMode || !me){ box.innerHTML = ""; return; }
+  const ini = me.nombre.split(/\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase();
+  box.innerHTML = `<span class="userchip"><span class="av">${esc(ini)}</span><span>${esc(me.nombre)}<small>${esc(me.perfil)}</small></span></span><button class="btn ghost sm" id="btnPwd" title="Cambiar mi contraseña">🔑</button><button class="btn ghost sm" id="btnLogout">Salir</button>`;
+  $("btnLogout").onclick = () => logout(false);
+  $("btnPwd").onclick = openPwdModal;
   // migrar datos guardados solo en este navegador
   const local = lsGet("r30k_files") || {};
   const pend = Object.keys(local).filter(id => !fileData[id]);
   const mig = $("migrateBox");
   if (mig){
-    if (serverMode && serverKey && pend.length){
+    if (serverMode && canEdit() && pend.length){
       mig.hidden = false;
       mig.innerHTML = `Este navegador tiene ${pend.length} archivo(s) que no están en el servidor: <b>${pend.map(id=>esc(local[id].name)).join(", ")}</b>. <button class="btn sm primary" id="btnMigrate">Subirlos al servidor</button> <button class="btn sm" id="btnMigrateNo">Descartar</button>`;
       $("btnMigrate").onclick = async () => { $("btnMigrate").disabled = true; let ok=0; for (const id of pend){ fileData[id] = local[id]; if (await persistFile(id)) ok++; } toast(`${ok} archivo(s) subidos al servidor`); if (ok===pend.length) lsSet("r30k_files", {}); renderAll(); };
@@ -1453,10 +1552,155 @@ function renderAccess(){
   }
 }
 
+/* ---------- acceso ---------- */
+let lgSetup = false;
+function showLogin(hasUsers){
+  lgSetup = !hasUsers;
+  document.body.classList.add("locked"); $("loginView").hidden = false;
+  $("lgTitle").textContent = lgSetup ? "Crea el primer administrador" : "Inicia sesión";
+  $("lgSub").textContent = lgSetup ? "Aún no hay usuarios. Este primer usuario tendrá el perfil ADMIN_SUPER y podrá crear a los demás." : "Ingresa con tu DNI y contraseña.";
+  $("lgNomRow").hidden = !lgSetup; $("lgKeyRow").hidden = !lgSetup;
+  $("lgPwd").autocomplete = lgSetup ? "new-password" : "current-password";
+  $("lgBtn").textContent = lgSetup ? "Crear administrador e ingresar" : "Ingresar";
+  $("lgErr").hidden = true; setTimeout(() => (lgSetup ? $("lgNom") : $("lgDni")).focus(), 50);
+}
+$("lgForm").onsubmit = async ev => {
+  ev.preventDefault(); const btn = $("lgBtn"); btn.disabled = true; $("lgErr").hidden = true;
+  try{
+    const body = lgSetup ? {nombre:$("lgNom").value, dni:$("lgDni").value.trim(), password:$("lgPwd").value, clave:$("lgKey").value} : {dni:$("lgDni").value.trim(), password:$("lgPwd").value};
+    const r = await api(lgSetup ? "/api/auth/setup" : "/api/auth/login", {method:"POST", body: JSON.stringify(body)});
+    setToken(r.token); me = r.user;
+    $("lgPwd").value = ""; $("lgKey").value = "";
+    $("loginView").hidden = true; document.body.classList.remove("locked");
+    await loadServerData(); renderAll(); setTab(location.hash.slice(1) || firstTab(), true);
+    toast(`Bienvenido, ${me.nombre.split(" ")[0]}`);
+  }catch(e){ $("lgErr").hidden = false; $("lgErr").textContent = e.message; }
+  finally{ btn.disabled = false; }
+};
+async function logout(expired){
+  if (!expired){ try{ await api("/api/auth/logout", {method:"POST"}); }catch(e){} }
+  setToken(null); me = null; fileData = {}; estructura = ESTRUCTURA_BASE.slice(); estrSource = "base";
+  renderAll();
+  let hasUsers = true; try{ hasUsers = (await api("/api/auth/status")).hasUsers; }catch(e){}
+  showLogin(hasUsers);
+}
+function openModal(html){ $("mdBody").innerHTML = html; $("modal").hidden = false; }
+function closeModal(){ $("modal").hidden = true; $("mdBody").innerHTML = ""; }
+$("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("modal").hidden) closeModal(); });
+function openPwdModal(){
+  openModal(`<h3>Cambiar mi contraseña</h3><form class="fm" id="mpForm" style="grid-template-columns:1fr">
+    <label>Contraseña actual<input type="password" id="mpA" required autocomplete="current-password"></label>
+    <label>Nueva contraseña<input type="password" id="mpN" required minlength="8" autocomplete="new-password"></label>
+    <label>Repite la nueva<input type="password" id="mpR" required minlength="8" autocomplete="new-password"></label>
+    <div class="msg err" id="mpErr" hidden></div>
+    <div class="act" style="justify-content:flex-end"><button type="button" class="btn" id="mpX">Cancelar</button><button class="btn primary">Guardar</button></div></form>`);
+  $("mpX").onclick = closeModal;
+  $("mpForm").onsubmit = async ev => { ev.preventDefault();
+    if ($("mpN").value !== $("mpR").value){ $("mpErr").hidden=false; $("mpErr").textContent="Las contraseñas nuevas no coinciden"; return; }
+    try{ await api("/api/auth/password", {method:"PUT", body: JSON.stringify({actual:$("mpA").value, nueva:$("mpN").value})}); closeModal(); toast("Contraseña actualizada"); }
+    catch(e){ $("mpErr").hidden=false; $("mpErr").textContent=e.message; } };
+}
+
+/* ---------- permisos por módulo ---------- */
+const TAB_PERM = {"radar":"ver_radar", "detalle-30k":"ver_detalle", "datos":"subir_datos", "usuarios":"gestionar_usuarios", "perfiles":"gestionar_perfiles"};
+const tabAllowed = name => { if (!(name in TAB_PERM)) return false; if ((name==="usuarios"||name==="perfiles") && !serverMode) return false; if (name==="datos" && !serverMode) return true; return perm(TAB_PERM[name]); };
+const firstTab = () => Object.keys(TAB_PERM).find(tabAllowed) || "radar";
+function applyPerms(){
+  document.querySelectorAll(".tab").forEach(b => b.hidden = !tabAllowed(b.dataset.tab));
+  const dl = perm("descargar") && (downloads || !window.claude);
+  $("btnXlsx").hidden = !dl; $("btnVentasAnio").hidden = !dl; $("btnCopy").hidden = !perm("descargar");
+  document.querySelectorAll("[data-goto]").forEach(b => b.hidden = !tabAllowed(b.dataset.goto));
+  const cur = document.querySelector(".tab.on"); if (cur && !tabAllowed(cur.dataset.tab)) setTab(firstTab());
+}
+
+/* ---------- módulo Usuarios ---------- */
+const PERM_LBL = {ver_radar:"Ver Radar de tiendas críticas", ver_detalle:"Ver Detalle a 30K", descargar:"Copiar y descargar Excel", subir_datos:"Subir y quitar archivos de venta", gestionar_usuarios:"Gestionar usuarios", gestionar_perfiles:"Gestionar perfiles"};
+let USERS = [], PERFILES = [], PERMS = [], uEditing = null, uDelAsk = null;
+const fmtDate = d => d ? new Date(d).toLocaleString("es-PE", {day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit"}) : "—";
+async function loadUsuarios(){
+  try{
+    const [p, u] = await Promise.all([api("/api/perfiles"), perm("gestionar_usuarios") ? api("/api/users") : Promise.resolve({users:[]})]);
+    PERFILES = p.perfiles; PERMS = p.permisos; USERS = u.users;
+    renderUsuarios(); renderPerfiles();
+  }catch(e){ serverFail(e, "cargar usuarios y perfiles"); }
+}
+function perfOptions(sel){ return PERFILES.map(p => `<option value="${esc(p.nombre)}" ${p.nombre===sel?"selected":""}>${esc(p.nombre)}</option>`).join(""); }
+function renderUsuarios(){
+  if (!$("uPerf")) return;
+  const cur = $("uPerf").value || "ANALISTA"; $("uPerf").innerHTML = perfOptions(cur);
+  $("uCount").textContent = `Usuarios (${USERS.length})`;
+  $("uTbl").innerHTML = `<thead><tr><th>Nombre</th><th>DNI</th><th>Perfil</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead><tbody>` + (USERS.length ? USERS.map(u => {
+    if (uEditing === u.id) return `<tr class="edit"><td colspan="6"><form class="fm" data-uedit="${u.id}" autocomplete="off">
+      <label>Nombre<input name="nombre" value="${esc(u.nombre)}" maxlength="120" required></label>
+      <label>DNI<input value="${esc(u.dni)}" disabled></label>
+      <label>Perfil<select name="perfil">${perfOptions(u.perfil)}</select></label>
+      <label>Estado<select name="activo"><option value="1" ${u.activo?"selected":""}>Activo</option><option value="0" ${!u.activo?"selected":""}>Inactivo</option></select></label>
+      <label>Nueva contraseña <small style="font-weight:400;color:var(--ink-3)">(vacío = no cambiar)</small><input name="password" type="password" minlength="8" autocomplete="new-password"></label>
+      <div class="act"><button type="button" class="btn" data-ucancel>Cancelar</button><button class="btn primary">Guardar</button></div></form></td></tr>`;
+    const self = me && me.id === u.id;
+    return `<tr><td><b>${esc(u.nombre)}</b>${self?` <span class="pill">tú</span>`:""}</td><td>${esc(u.dni)}</td><td><span class="pf ${esc(u.perfil)}">${esc(u.perfil)}</span></td>
+      <td>${u.activo?`<span class="st-on">● Activo</span>`:`<span class="st-off">○ Inactivo</span>`}</td><td style="color:var(--ink-2)">${fmtDate(u.last_login)}</td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-uedit-open="${u.id}">Editar</button> ${self?"":(uDelAsk===u.id?`<button class="btn sm danger" data-udel="${u.id}">¿Eliminar? Sí</button> <button class="btn sm" data-udel-no>No</button>`:`<button class="btn sm danger" data-udel-ask="${u.id}">Eliminar</button>`)}</td></tr>`;
+  }).join("") : `<tr><td colspan="6" style="color:var(--ink-2);padding:20px;text-align:center">Aún no hay usuarios.</td></tr>`) + `</tbody>`;
+  $("uTbl").querySelectorAll("[data-uedit-open]").forEach(b => b.onclick = () => { uEditing = +b.dataset.ueditOpen; uDelAsk = null; renderUsuarios(); });
+  $("uTbl").querySelectorAll("[data-ucancel]").forEach(b => b.onclick = () => { uEditing = null; renderUsuarios(); });
+  $("uTbl").querySelectorAll("[data-udel-ask]").forEach(b => b.onclick = () => { uDelAsk = +b.dataset.udelAsk; renderUsuarios(); });
+  $("uTbl").querySelectorAll("[data-udel-no]").forEach(b => b.onclick = () => { uDelAsk = null; renderUsuarios(); });
+  $("uTbl").querySelectorAll("[data-udel]").forEach(b => b.onclick = async () => {
+    try{ await api("/api/users/" + b.dataset.udel, {method:"DELETE"}); uDelAsk = null; toast("Usuario eliminado"); await loadUsuarios(); } catch(e){ uDelAsk = null; toast(e.message); renderUsuarios(); } });
+  $("uTbl").querySelectorAll("[data-uedit]").forEach(f => f.onsubmit = async ev => {
+    ev.preventDefault(); const fd = new FormData(f);
+    const body = {nombre: fd.get("nombre"), perfil: fd.get("perfil"), activo: fd.get("activo")==="1"}; if (fd.get("password")) body.password = fd.get("password");
+    try{ await api("/api/users/" + f.dataset.uedit, {method:"PUT", body: JSON.stringify(body)}); uEditing = null; toast("Usuario actualizado"); await loadUsuarios(); } catch(e){ toast(e.message); } });
+}
+$("uForm").onsubmit = async ev => {
+  ev.preventDefault(); $("uErr").hidden = true;
+  const body = {nombre:$("uNom").value, dni:$("uDni").value.trim(), password:$("uPwd").value, perfil:$("uPerf").value};
+  try{ await api("/api/users", {method:"POST", body: JSON.stringify(body)}); toast(`Usuario ${body.nombre} creado con perfil ${body.perfil}`); $("uForm").reset(); await loadUsuarios(); }
+  catch(e){ $("uErr").hidden = false; $("uErr").textContent = e.message; }
+};
+$("uEye").onclick = () => { const i = $("uPwd"); i.type = i.type === "password" ? "text" : "password"; };
+$("uGen").onclick = () => { const a = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"; const r = crypto.getRandomValues(new Uint32Array(10)); $("uPwd").value = "Pr" + [...r].map(x => a[x % a.length]).join(""); $("uPwd").type = "text"; };
+
+/* ---------- módulo Perfiles ---------- */
+let pDelAsk = null;
+function permBoxes(prefix, permisos, locked){
+  return PERMS.map(k => `<label class="perm"><input type="checkbox" data-${prefix}="${k}" ${permisos && permisos[k] ? "checked":""} ${locked?"disabled":""}> ${PERM_LBL[k] || k}</label>`).join("");
+}
+function renderPerfiles(){
+  if (!$("pGrid")) return;
+  $("pGrid").innerHTML = PERFILES.map(p => `<div class="pcard" data-pname="${esc(p.nombre)}">
+    <h3><span class="pf ${esc(p.nombre)}">${esc(p.nombre)}</span>${p.bloqueado?`<span class="pill">🔒 fijo</span>`:""}<span style="margin-left:auto;font-size:12px;color:var(--ink-2);font-weight:500">${p.usuarios} usuario(s)</span></h3>
+    <input class="pdesc" value="${esc(p.descripcion||"")}" maxlength="200" placeholder="Descripción" style="padding:8px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink)">
+    ${permBoxes("pp", p.permisos, p.bloqueado)}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      ${["ADMIN_SUPER","ANALISTA","GERENCIA"].includes(p.nombre) ? "" : (pDelAsk===p.nombre ? `<button class="btn sm danger" data-pdel>¿Eliminar? Sí</button><button class="btn sm" data-pdel-no>No</button>` : `<button class="btn sm danger" data-pdel-ask>Eliminar</button>`)}
+      <button class="btn sm primary" data-psave>Guardar</button></div></div>`).join("");
+  $("pNewPerms").innerHTML = permBoxes("pn", {ver_radar:true, ver_detalle:true, descargar:true}, false);
+  $("pGrid").querySelectorAll(".pcard").forEach(c => {
+    const n = c.dataset.pname, p = PERFILES.find(x => x.nombre === n);
+    c.querySelector("[data-psave]").onclick = async () => {
+      const permisos = Object.fromEntries([...c.querySelectorAll("[data-pp]")].map(i => [i.dataset.pp, i.checked]));
+      const body = {descripcion: c.querySelector(".pdesc").value}; if (!p.bloqueado) body.permisos = permisos;
+      try{ await api("/api/perfiles/" + encodeURIComponent(n), {method:"PUT", body: JSON.stringify(body)}); toast(`Perfil ${n} guardado`); await loadUsuarios(); if (me && me.perfil === n){ me = (await api("/api/auth/me")).user; renderAccess(); } } catch(e){ toast(e.message); } };
+    const ask = c.querySelector("[data-pdel-ask]"); if (ask) ask.onclick = () => { pDelAsk = n; renderPerfiles(); };
+    const no = c.querySelector("[data-pdel-no]"); if (no) no.onclick = () => { pDelAsk = null; renderPerfiles(); };
+    const del = c.querySelector("[data-pdel]"); if (del) del.onclick = async () => { try{ await api("/api/perfiles/" + encodeURIComponent(n), {method:"DELETE"}); pDelAsk = null; toast(`Perfil ${n} eliminado`); await loadUsuarios(); } catch(e){ pDelAsk = null; toast(e.message); renderPerfiles(); } };
+  });
+}
+$("pForm").onsubmit = async ev => {
+  ev.preventDefault(); $("pErr").hidden = true;
+  const permisos = Object.fromEntries([...document.querySelectorAll("[data-pn]")].map(i => [i.dataset.pn, i.checked]));
+  try{ const r = await api("/api/perfiles", {method:"POST", body: JSON.stringify({nombre:$("pNom").value, descripcion:$("pDesc").value, permisos})}); toast(`Perfil ${r.nombre} creado`); $("pForm").reset(); await loadUsuarios(); }
+  catch(e){ $("pErr").hidden = false; $("pErr").textContent = e.message; }
+};
+
 /* ---------- módulos ---------- */
-const TABS = ["radar","detalle-30k","datos"];
+const TABS = Object.keys(TAB_PERM);
 function setTab(name, fromHash){
-  if (!TABS.includes(name)) name = "radar";
+  if (!TABS.includes(name) || !tabAllowed(name)) name = firstTab();
+  if ((name === "usuarios" || name === "perfiles") && serverMode && me) loadUsuarios();
   document.querySelectorAll(".tabpane").forEach(p => p.hidden = p.dataset.pane !== name);
   document.querySelectorAll(".tab").forEach(b => { const on = b.dataset.tab === name; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
   if (!fromHash){ try{ if (location.hash !== "#"+name) history.replaceState(null, "", "#"+name); }catch(e){} }
@@ -1477,9 +1721,9 @@ renderAll();
     }
   }catch(e){}
   // fuera de claude.ai (p. ej. Render) la descarga directa del navegador funciona
-  if (downloads || !window.claude){ $("btnXlsx").hidden = false; $("btnVentasAnio").hidden = false; }
   await loadPersisted();
   renderAll();
+  if (!document.body.classList.contains("locked")) setTab(location.hash.slice(1) || firstTab(), true);
 })();
 </script>
 </body>
