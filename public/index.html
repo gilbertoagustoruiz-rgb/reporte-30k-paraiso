@@ -202,6 +202,26 @@ body.locked .tabs, body.locked .wrap, body.locked #btnUploadTop{display:none!imp
 .rd-stat .v{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-top:4px;font-variant-numeric:tabular-nums;line-height:1.05}
 .rd-stat .s{font-size:12px;color:rgba(255,255,255,.72);margin-top:4px}
 .rd-stat.hot{background:linear-gradient(160deg,rgba(208,59,59,.45),rgba(208,59,59,.15));border-color:rgba(255,120,120,.45)}
+.rd-stat[data-list]{cursor:pointer;transition:transform .15s, border-color .15s}
+.rd-stat[data-list]:hover,.rd-stat[data-list].open{transform:translateY(-2px);border-color:rgba(255,255,255,.45)}
+.rd-stat .more{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:11px;font-weight:700;color:#fff;opacity:.85}
+#rdPop{position:fixed;z-index:70;width:min(420px,calc(100vw - 24px));max-height:min(440px,70vh);display:flex;flex-direction:column;background:var(--surface);color:var(--ink);border:1px solid var(--line-2);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.35);overflow:hidden}
+#rdPop[hidden]{display:none}
+#rdPop .ph{padding:12px 14px 8px;border-bottom:1px solid var(--line)}
+#rdPop .ph b{font-size:14px}
+#rdPop .ph small{display:block;color:var(--ink-2);font-size:11px;margin-top:2px}
+#rdPop .pf2{display:flex;gap:6px;margin-top:8px}
+#rdPop .pf2 input{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface);color:var(--ink);font-size:12px}
+#rdPop ol{list-style:none;margin:0;padding:4px 0;overflow:auto;flex:1}
+#rdPop li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:7px 14px;cursor:pointer;font-size:12px}
+#rdPop li:hover{background:var(--surface-2)}
+#rdPop li .i{color:var(--ink-3);font-weight:700;text-align:right}
+#rdPop li > span{min-width:0}
+#rdPop li .nm{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rdPop li .cd{display:block;margin-top:1px;font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
+#rdPop li .vv{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+#rdPop li .vv small{display:block;color:var(--ink-3);font-size:10px}
+#rdPop .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
 .rd-sema{margin-top:18px;position:relative;z-index:1}
 .rd-sema .bar{display:flex;height:16px;border-radius:999px;overflow:hidden;gap:2px;background:rgba(255,255,255,.08)}
 .rd-sema .bar i{display:block;height:100%}
@@ -1261,6 +1281,7 @@ $("btnXlsx").onclick = async () => {
 };
 
 /* ===================== RADAR DE TIENDAS CRÍTICAS ===================== */
+let RD_LISTS = null;
 const fmtK = v => { if (v==null || isNaN(v)) return "—"; const a = Math.abs(v); if (a>=1e6) return "S/ " + (v/1e6).toFixed(a>=1e7?1:2).replace(/\.?0+$/,"") + "M"; if (a>=1e3) return "S/ " + Math.round(v/1e3) + "K"; return "S/ " + Math.round(v); };
 const pct = v => (v==null||!isFinite(v)) ? "—" : Math.round(v*100) + "%";
 function tierOf(r, Y, U){ const y = r.yp[Y]; if (!y || y.p==null) return "nos"; if (y.p < U*0.5) return "crit"; if (y.p < U) return "risk"; return "ok"; }
@@ -1343,6 +1364,50 @@ function spark(vals, U){
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block"><line x1="0" x2="${W}" y1="${Y(U)}" y2="${Y(U)}" stroke="var(--ink-3)" stroke-dasharray="2 2"/><polyline points="${pts.map(p=>p.join(",")).join(" ")}" fill="none" stroke="var(--par)" stroke-width="1.6"/><circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="2.5" fill="var(--par)"/></svg>`;
 }
 
+/* panel con la lista de tiendas de una tarjeta del radar */
+const rdPop = (() => { const d = document.createElement("div"); d.id = "rdPop"; d.hidden = true; d.setAttribute("role","dialog"); document.body.appendChild(d); return d; })();
+let rdPopTimer = null, rdPopKey = null, rdPopPinned = false;
+function rdPopRows(L, q){
+  const {Y, U} = RD_LISTS; const nq = norm(q||"");
+  return L.rows.filter(r => !nq || norm(r.p+" "+r.c).includes(nq)).map((r,i) => {
+    const p = r.yp[Y].p, tier = tierOf(r, Y, U);
+    const rival = COMPETENCIA.filter(b => (r.b[b]||0) > (r.b.PARAISO||0)).map(b => BRAND_LABEL[b]+" "+r.b[b]).join(", ");
+    return `<li data-key="${esc(r.key)}"><span class="i">${i+1}</span><span><span class="nm"><span class="dot" style="background:${TIER[tier].col}"></span>${esc(titleCase(r.p))}</span><span class="cd">${esc(r.c)}${L.red ? ` · Paraíso ${r.b.PARAISO||0} vs ${esc(rival)}` : ` · ${esc(r.g||"")}`}</span></span><span class="vv"><b>${fmtK(p)}</b>/mes<small>falta ${fmtK(U-p)}</small></span></li>`;
+  }).join("") || `<li style="cursor:default;color:var(--ink-2)"><span></span><span>Sin coincidencias</span><span></span></li>`;
+}
+function rdPopCopy(L){
+  const {Y, U} = RD_LISTS;
+  return ["Cadena\tPunto de venta\tCargo\tPromedio mensual\tFalta para " + RD_LISTS.uLbl].concat(L.rows.map(r => [r.c, titleCase(r.p), r.g||"", Math.round(r.yp[Y].p), Math.round(U - r.yp[Y].p)].join("\t"))).join("\n");
+}
+function openRdPop(card, pin){
+  if (!RD_LISTS) return; const key = card.dataset.list, L = RD_LISTS[key]; if (!L) return;
+  clearTimeout(rdPopTimer); rdPopKey = key; rdPopPinned = !!pin;
+  document.querySelectorAll(".rd-stat.open").forEach(c => c.classList.remove("open")); card.classList.add("open");
+  rdPop.innerHTML = `<div class="ph"><b>${esc(L.title)}</b><small>${esc(L.sub)} · clic en una tienda para ver su detalle</small>
+    <div class="pf2"><input type="search" placeholder="Filtrar por tienda o cadena" aria-label="Filtrar tiendas">${perm("descargar")?`<button class="btn sm" data-copy>Copiar lista</button>`:""}<button class="btn sm" data-x aria-label="Cerrar">✕</button></div></div><ol>${rdPopRows(L)}</ol>`;
+  rdPop.hidden = false;
+  const r = card.getBoundingClientRect(), pw = rdPop.offsetWidth, ph = rdPop.offsetHeight;
+  let left = Math.min(Math.max(12, r.left), innerWidth - pw - 12);
+  let top = r.bottom + 8; if (top + ph > innerHeight - 12) top = Math.max(12, r.top - ph - 8);
+  rdPop.style.left = left + "px"; rdPop.style.top = top + "px";
+  const inp = rdPop.querySelector("input"); inp.oninput = () => { rdPop.querySelector("ol").innerHTML = rdPopRows(L, inp.value); };
+  rdPop.querySelector("[data-x]").onclick = closeRdPop;
+  const cp = rdPop.querySelector("[data-copy]"); if (cp) cp.onclick = async () => { try{ await navigator.clipboard.writeText(rdPopCopy(L)); toast(`${L.rows.length} tiendas copiadas: pégalas en Excel`); }catch(e){ toast("No se pudo copiar en esta vista"); } };
+  if (pin) setTimeout(() => inp.focus(), 30);
+}
+function closeRdPop(){ clearTimeout(rdPopTimer); rdPop.hidden = true; rdPopKey = null; rdPopPinned = false; document.querySelectorAll(".rd-stat.open").forEach(c => c.classList.remove("open")); }
+const schedClose = () => { if (rdPopPinned) return; clearTimeout(rdPopTimer); rdPopTimer = setTimeout(closeRdPop, 250); };
+rdPop.addEventListener("mouseenter", () => clearTimeout(rdPopTimer));
+rdPop.addEventListener("mouseleave", schedClose);
+rdPop.addEventListener("click", e => {
+  const li = e.target.closest("li[data-key]"); if (!li) return;
+  const r = MODEL.rows.find(x => x.key === li.dataset.key); if (!r) return;
+  closeRdPop(); $("fSearch").value = titleCase(r.p); setTab("detalle-30k"); renderView(); setTimeout(() => document.querySelector(".tblwrap").scrollIntoView({behavior:"smooth", block:"start"}), 50);
+});
+document.addEventListener("click", e => { if (!rdPop.hidden && !rdPop.contains(e.target) && !e.target.closest(".rd-stat[data-list]")) closeRdPop(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !rdPop.hidden) closeRdPop(); });
+window.addEventListener("scroll", () => { if (!rdPop.hidden && !rdPopPinned) closeRdPop(); }, {passive:true});
+
 function renderRadar(rows, Y, U, uLbl){
   const box = $("radar"); if (!box) return;
   const months = MODEL.months.filter(m => m.startsWith(Y));
@@ -1356,6 +1421,9 @@ function renderRadar(rows, Y, U, uLbl){
   const low = [...T.crit, ...T.risk];
   const red = low.filter(r => promAlert(r));
   const gap = low.reduce((a,r) => a + (U - r.yp[Y].p), 0);
+  RD_LISTS = {Y, U, uLbl,
+    low: {title:`${low.length} tiendas bajo ${uLbl}`, sub:`Promedio mensual de venta Paraíso ${Y}, de menor a mayor`, rows: low.slice().sort((a,b)=>a.yp[Y].p-b.yp[Y].p)},
+    red: {title:`${red.length} tiendas en zona roja`, sub:`Bajo ${uLbl} y con más promotores de la competencia que de Paraíso`, rows: red.slice().sort((a,b)=>a.yp[Y].p-b.yp[Y].p), red:true}};
   const sumP = rs => rs.reduce((a,r)=>a+(r.yp[Y]?.t||0),0), sumC = rs => rs.reduce((a,r)=>a+(r.yc[Y]?.t||0),0);
   const shareLow = (sumP(low)+sumC(low)) ? sumP(low)/(sumP(low)+sumC(low)) : null;
   const shareAll = (sumP(rows)+sumC(rows)) ? sumP(rows)/(sumP(rows)+sumC(rows)) : null;
@@ -1370,9 +1438,9 @@ function renderRadar(rows, Y, U, uLbl){
     <div class="rd-title">${low.length ? `${low.length} tiendas venden menos de ${fmtK(U)} al mes` : `Ninguna tienda bajo ${fmtK(U)} al mes`}</div>
     <div class="rd-sub">Promedio mensual de venta Paraíso (Paraíso, Krea, Komfort, Viva Home, Casa Joven) · ${esc(filt)} · datos hasta ${ymLabel(lastM)}.</div>
     <div class="rd-big">
-      <div class="rd-stat hot"><div class="k">Tiendas bajo ${uLbl}</div><div class="v">${low.length}</div><div class="s">${withSale ? pct(low.length/withSale) : "—"} de las ${withSale} tiendas con venta · ${T.crit.length} críticas</div></div>
+      <div class="rd-stat hot" ${low.length?`data-list="low" tabindex="0" role="button" aria-label="Ver las ${low.length} tiendas bajo ${uLbl}"`:""}><div class="k">Tiendas bajo ${uLbl}</div><div class="v">${low.length}</div><div class="s">${withSale ? pct(low.length/withSale) : "—"} de las ${withSale} tiendas con venta · ${T.crit.length} críticas</div>${low.length?`<div class="more">☰ Ver tiendas</div>`:""}</div>
       <div class="rd-stat"><div class="k">Brecha mensual a ${uLbl}</div><div class="v">${fmtK(gap)}</div><div class="s">Venta extra al mes para que todas lleguen al umbral</div></div>
-      <div class="rd-stat ${red.length?"hot":""}"><div class="k">Zona roja</div><div class="v">${red.length}</div><div class="s">Bajo ${uLbl} y con más promotores de la competencia que de Paraíso</div></div>
+      <div class="rd-stat ${red.length?"hot":""}" ${red.length?`data-list="red" tabindex="0" role="button" aria-label="Ver las ${red.length} tiendas en zona roja"`:""}><div class="k">Zona roja</div><div class="v">${red.length}</div><div class="s">Bajo ${uLbl} y con más promotores de la competencia que de Paraíso</div>${red.length?`<div class="more">☰ Ver tiendas</div>`:""}</div>
       <div class="rd-stat"><div class="k">Participación Paraíso</div><div class="v">${hasComp ? pct(shareLow) : "—"}</div><div class="s">${hasComp ? `en tiendas bajo ${uLbl} · ${pct(shareAll)} en el total` : "Sin venta de competencia cargada"}</div></div>
     </div>
     <div class="rd-sema">
@@ -1439,6 +1507,13 @@ function renderRadar(rows, Y, U, uLbl){
       ${svgScatter(pts, U, {aria:"Cuadrante de tiendas"})}</div>`;
   }
   box.innerHTML = h;
+  closeRdPop();
+  box.querySelectorAll(".rd-stat[data-list]").forEach(card => {
+    card.addEventListener("mouseenter", () => { if (!rdPopPinned) { clearTimeout(rdPopTimer); rdPopTimer = setTimeout(() => openRdPop(card, false), 120); } });
+    card.addEventListener("mouseleave", () => { clearTimeout(rdPopTimer); schedClose(); });
+    card.addEventListener("click", e => { e.stopPropagation(); (rdPopKey === card.dataset.list && rdPopPinned) ? closeRdPop() : openRdPop(card, true); });
+    card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); openRdPop(card, true); } });
+  });
   // clic -> buscar tienda en la tabla
   box.querySelectorAll("[data-key]").forEach(el => el.addEventListener("click", () => {
     const r = MODEL.rows.find(x => x.key === el.dataset.key); if (!r) return;

@@ -27,7 +27,7 @@ Cadena, año y umbral se comparten entre el radar y el detalle; los demás filtr
 
 ## Radar de tiendas críticas
 Panel superior para evaluar tiendas críticas (año de referencia, venta Paraíso):
-- Cifras clave: tiendas bajo el umbral, brecha mensual para llegar a 30K, «zona roja» (bajo 30K + alerta de promotoría) y participación Paraíso.
+- Cifras clave: tiendas bajo el umbral, brecha mensual para llegar a 30K, «zona roja» (bajo 30K + alerta de promotoría) y participación Paraíso. Al pasar el puntero (o tocar) «Tiendas bajo 30K» y «Zona roja» se abre la lista de tiendas, con filtro, copia y acceso a su detalle.
 - Semáforo: Crítica (< 50% del umbral), En riesgo (50–100%), Saludable (≥ umbral), Sin venta.
 - Gráficos: tiendas bajo 30K mes a mes (mes en curso rayado), venta Paraíso vs competencia, cadenas por estado y cuadrante venta vs participación.
 - Top 15 tiendas más críticas con avance al umbral, tendencia, promotores y alertas; clic para ver la tienda en la tabla.
