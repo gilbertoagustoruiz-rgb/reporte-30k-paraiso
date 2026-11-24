@@ -1,0 +1,10 @@
+{
+  "name": "reporte-30k-paraiso",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reporte 30K Paraíso: dashboard + servidor con Postgres",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "build": "python3 build.py" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "express": "^4.21.2", "pg": "^8.13.1" }
+}

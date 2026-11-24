@@ -29,6 +29,7 @@
   }
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
 button,select,input{font:inherit;color:inherit}
 .wrap{max-width:100%;padding:0 20px 40px}
@@ -138,11 +139,13 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
     <div class="sub" id="hdrSub">Estructura de promotoría 2026 · Ventas por punto de venta</div>
   </div>
   <div class="sp"></div>
+  <span id="accessBox" style="display:flex;gap:8px;align-items:center"></span>
   <button class="btn ghost" id="btnUploadTop">⬆ Subir datos</button>
 </header>
 
 <div class="wrap">
 
+  <div class="msg" id="serverStatus" hidden style="margin-top:16px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface)"></div>
   <section class="card" id="uploadCard">
     <h2>Datos del reporte</h2>
     <p class="hint">Sube tus Excel (.xlsx, .xls, .xlsb) o CSV de venta anual. La página detecta las columnas de punto de venta, fecha o mes y venta; revisa el mapeo y agrégalo. Cada archivo se cruza con la estructura de promotoría por nombre de punto de venta.</p>
@@ -167,6 +170,7 @@ details.unm ul{columns:3;font-size:11px;color:var(--ink-2);margin:8px 0 0;paddin
       </div>
     </div>
     <div class="msg" id="storeMsg"></div>
+    <div class="msg" id="migrateBox" hidden style="margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--accent-soft);color:var(--ink)"></div>
   </section>
 
   <div class="kpis" id="kpis"></div>
@@ -299,8 +303,42 @@ function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||"null")}catch(e
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 function docId(name){return (name.replace(/[^A-Za-z0-9_\-.]/g,"_").slice(0,150) || "archivo");}
 
+/* ---------- servidor (Render + Postgres) ----------
+   En el sitio de Render los datos se guardan en el servidor para que todos vean lo mismo.
+   Ver es libre; subir/quitar requiere la contraseña (variable UPLOAD_PASSWORD del servidor). */
+const API_HOST = "https://reporte-30k-paraiso-api.onrender.com";
+const API_BASE = (() => {
+  const h = location.hostname;
+  if (h === "reporte-30k-paraiso-api.onrender.com") return "";       // página servida por el propio servidor
+  if (h === "reporte-30k-paraiso.onrender.com") return API_HOST;      // sitio estático -> servidor
+  if (/^(localhost|127\.0\.0\.1)$/.test(h) && location.port) return "";
+  return null;                                                         // claude.ai u otro: sin servidor
+})();
+let serverMode = false, serverKey = null, serverDown = false;
+try{ serverKey = sessionStorage.getItem("r30k_key"); }catch(e){}
+async function api(path, opts={}, timeoutMs=90000){
+  const ctl = new AbortController(); const tm = setTimeout(()=>ctl.abort(), timeoutMs);
+  try{
+    const headers = {"Content-Type":"application/json"}; if (serverKey) headers["X-Upload-Key"] = serverKey;
+    const r = await fetch(API_BASE + path, {...opts, headers:{...headers, ...(opts.headers||{})}, signal:ctl.signal});
+    const body = await r.json().catch(()=>({}));
+    if (!r.ok){ const e = new Error(body.error || ("HTTP "+r.status)); e.status = r.status; throw e; }
+    return body;
+  } finally { clearTimeout(tm); }
+}
+const canEdit = () => !serverMode || !!serverKey;
+function serverFail(e, what){
+  console.warn(e);
+  if (e && e.status===401){ serverKey = null; try{ sessionStorage.removeItem("r30k_key"); }catch(_){} renderAccess(); toast("Contraseña inválida o vencida: vuelve a entrar en modo edición."); }
+  else toast(`No se pudo ${what} en el servidor (${e && e.message || "error"}).`);
+}
+
 async function persistFile(id){
   const f = fileData[id];
+  if (serverMode){
+    try{ await api("/api/files/" + encodeURIComponent(id), {method:"PUT", body: JSON.stringify(f)}, 180000); return true; }
+    catch(e){ serverFail(e, "guardar el archivo"); delete fileData[id]; return false; }
+  }
   // dividir por año para respetar el límite por documento
   const byYear = {};
   for (const [k,s] of Object.entries(f.stores)){
@@ -330,6 +368,11 @@ async function persistFile(id){
   return false;
 }
 async function removeFile(id){
+  if (serverMode){
+    try{ await api("/api/files/" + encodeURIComponent(id), {method:"DELETE"}); }
+    catch(e){ serverFail(e, "quitar el archivo"); return; }
+    delete fileData[id]; renderAll(); return;
+  }
   delete fileData[id];
   if (db){
     try{ const prev = await db.collection("ventas").where("file","==",id).get(); for (const d of prev.docs) await db.collection("ventas").doc(d.id).delete(); }
@@ -340,10 +383,30 @@ async function removeFile(id){
 }
 async function persistEstr(){
   const payload = {source:estrSource, rows:estructura};
+  if (serverMode){
+    try{ if (estrSource==="base") await api("/api/estructura", {method:"DELETE"}); else await api("/api/estructura", {method:"PUT", body: JSON.stringify(payload)}); }
+    catch(e){ serverFail(e, "guardar la estructura"); }
+    return;
+  }
   if (db){ try{ if (estrSource==="base") await db.doc("config/estructura").delete(); else await db.doc("config/estructura").set(payload); return; }catch(e){console.warn(e);} }
   lsSet("r30k_estr", estrSource==="base" ? null : payload);
 }
 async function loadPersisted(){
+  if (API_BASE !== null){
+    setServerStatus("Conectando con el servidor… (si estuvo inactivo puede tardar ~1 minuto en despertar)");
+    try{
+      const d = await api("/api/data", {}, 120000);
+      serverMode = true; serverDown = false;
+      fileData = {}; for (const f of d.files || []) fileData[f.id] = {name:f.name, uploadedAt:f.uploadedAt, v:f.v||1, modo:f.modo||"todas", stores:f.stores||{}};
+      if (d.estructura && d.estructura.rows){ estructura = d.estructura.rows; estrSource = d.estructura.source; }
+      if (serverKey){ try{ await api("/api/login", {method:"POST", body: JSON.stringify({key: serverKey})}); } catch(e){ serverKey = null; try{ sessionStorage.removeItem("r30k_key"); }catch(_){} } }
+      setServerStatus("");
+      return;
+    }catch(e){
+      console.warn(e); serverDown = true;
+      setServerStatus("⚠ No se pudo conectar con el servidor: se muestran solo los datos guardados en este navegador. Recarga en un minuto.", true);
+    }
+  }
   if (db){
     try{
       const snap = await db.collection("ventas").get();
@@ -712,7 +775,7 @@ async function commitPending(){
     if (!Object.keys(stores).length) continue;
     const id = docId(pf.file.name);
     fileData[id] = {name:pf.file.name, uploadedAt:new Date().toISOString(), v:2, modo:loadMode, stores};
-    await persistFile(id); added++;
+    if (await persistFile(id) || !serverMode) added++;
   }
   pending = null; renderPending(); renderAll();
   toast(added ? `${added} archivo(s) agregados al reporte` : "No había datos válidos para agregar");
@@ -823,6 +886,7 @@ function renderAll(){
   $("storeMsg").textContent = MODEL.hasSales ? `${MODEL.rows.length - u.length - MODEL.noSales} PDV cruzados con venta · ${MODEL.noSales} PDV de la estructura sin venta en los archivos.` : "";
   $("hdrSub").textContent = MODEL.hasSales ? `Ventas ${ymLabel(MODEL.months[0])} a ${ymLabel(MODEL.months[MODEL.months.length-1])} · Estructura de promotoría 2026` : "Estructura de promotoría 2026 · Sube los archivos de venta para ver el reporte";
   renderView();
+  renderAccess();
 }
 
 function filteredRows(yearOverride){
@@ -1062,6 +1126,45 @@ $("btnVentasAnio").onclick = async () => {
 
 // tooltip
 document.addEventListener("mousemove", e => { const el = e.target.closest("[data-tip]"); const tp = $("tip"); if (!el){ tp.style.display="none"; return; } tp.textContent = el.dataset.tip; tp.style.display="block"; tp.style.left = Math.min(e.clientX+12, innerWidth-270)+"px"; tp.style.top = (e.clientY+14)+"px"; });
+
+function setServerStatus(msg, warn){
+  const el = $("serverStatus"); if (!el) return;
+  el.hidden = !msg; el.textContent = msg || "";
+  el.style.borderColor = warn ? "var(--warn)" : "var(--line)"; el.style.background = warn ? "var(--warn-bg)" : "var(--surface)"; el.style.color = warn ? "var(--warn-ink)" : "var(--ink-2)";
+}
+function renderAccess(){
+  const box = $("accessBox"); if (!box) return;
+  const lock = !canEdit();
+  // bloquear carga/quitar mientras no haya contraseña
+  ["inVentas","inEstr"].forEach(id => { const el = $(id); if (el) el.disabled = lock; });
+  document.querySelectorAll("#dropVentas,#dropEstr").forEach(z => { z.style.opacity = lock ? .55 : 1; z.style.pointerEvents = lock ? "none" : ""; });
+  document.querySelectorAll("[data-del],#btnEstrReset").forEach(b => b.hidden = lock);
+  $("btnUploadTop").hidden = lock;
+  if (!serverMode){ box.innerHTML = ""; return; }
+  if (serverKey){
+    box.innerHTML = `<span class="pill ok">✎ Modo edición</span><button class="btn ghost sm" id="btnLogout">Salir</button>`;
+    $("btnLogout").onclick = () => { serverKey = null; try{ sessionStorage.removeItem("r30k_key"); }catch(e){} renderAccess(); renderAll(); };
+  } else {
+    box.innerHTML = `<form id="loginForm" style="display:flex;gap:6px;align-items:center"><input type="password" id="loginPwd" placeholder="Contraseña para subir" autocomplete="current-password" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;width:170px"><button class="btn ghost sm" type="submit">🔒 Editar</button></form>`;
+    $("loginForm").onsubmit = async (ev) => {
+      ev.preventDefault(); const k = $("loginPwd").value; if (!k) return;
+      try{ serverKey = k; await api("/api/login", {method:"POST", body: JSON.stringify({key:k})}); try{ sessionStorage.setItem("r30k_key", k); }catch(e){} toast("Modo edición activado"); renderAccess(); renderAll(); }
+      catch(e){ serverKey = null; toast(e.status===401 ? "Contraseña incorrecta" : ("No se pudo validar: " + e.message)); }
+    };
+  }
+  // migrar datos guardados solo en este navegador
+  const local = lsGet("r30k_files") || {};
+  const pend = Object.keys(local).filter(id => !fileData[id]);
+  const mig = $("migrateBox");
+  if (mig){
+    if (serverMode && serverKey && pend.length){
+      mig.hidden = false;
+      mig.innerHTML = `Este navegador tiene ${pend.length} archivo(s) que no están en el servidor: <b>${pend.map(id=>esc(local[id].name)).join(", ")}</b>. <button class="btn sm primary" id="btnMigrate">Subirlos al servidor</button> <button class="btn sm" id="btnMigrateNo">Descartar</button>`;
+      $("btnMigrate").onclick = async () => { $("btnMigrate").disabled = true; let ok=0; for (const id of pend){ fileData[id] = local[id]; if (await persistFile(id)) ok++; } toast(`${ok} archivo(s) subidos al servidor`); if (ok===pend.length) lsSet("r30k_files", {}); renderAll(); };
+      $("btnMigrateNo").onclick = () => { lsSet("r30k_files", {}); renderAccess(); };
+    } else mig.hidden = true;
+  }
+}
 
 /* ---------- arranque ---------- */
 renderAll();

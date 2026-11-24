@@ -6,7 +6,9 @@ Dashboard web del reporte 30K de la cuenta Paraíso (Below Trade): venta mensual
 1. Abre el sitio y pulsa **Subir datos**.
 2. Carga los Excel (.xlsx/.xls/.xlsb) o CSV de venta anual. La página detecta las columnas (PDV, AÑO/MES o FECHA, PRECIO TOTAL o VENTA, MARCA, TIPO) y permite ajustar el mapeo.
    Por defecto solo suma las marcas Paraíso, Krea, Komfort, Viva Home y Casa Joven (columna MARCA) y solo las filas COBERTURADO o COBERTURADOS (columna COBERTURA); se puede cambiar en la revisión.
-3. Pulsa **Agregar al reporte**. Los datos se procesan en el navegador y quedan guardados en ese navegador (localStorage); no se envían a ningún servidor.
+3. Pulsa **Agregar al reporte**. El Excel se procesa en el navegador y solo se envía al servidor el resumen por tienda y mes, que queda guardado en Postgres: todos los que abren el sitio ven lo mismo.
+
+Ver el reporte es libre. Para subir, reemplazar o quitar archivos hay que entrar en **🔒 Editar** con la contraseña del servidor (variable `UPLOAD_PASSWORD`).
 
 ## Ventas de competencia
 Al subir un archivo se elige **«Todas las marcas»** (grupo Paraíso + competencia) o **«Solo marcas Paraíso»** (Paraíso, Krea, Komfort, Viva Home, Casa Joven; el resto no se guarda). La elección queda registrada en la lista de archivos.
@@ -22,9 +24,14 @@ Las filas cuya MARCA no pertenece al grupo Paraíso (Paraíso, Casa Joven, Viva 
 - `src/template.html` — código fuente de la página.
 - `src/estructura.json` — estructura de promotoría 2026 (fuente: Google Sheet «ESTRUCTURA PROMOTORIA 2026»).
 - `build.py` — regenera `public/index.html`: `python3 build.py`.
+- `server.js` / `package.json` — servidor Express + Postgres.
 
-## Despliegue
-Sitio estático en Render: publish path `public`, sin paso de compilación.
+## Despliegue (Render)
+- **Sitio** `reporte-30k-paraiso` (estático, publish path `public`): https://reporte-30k-paraiso.onrender.com
+- **Servidor** `reporte-30k-paraiso-api` (Node, `node server.js`): API `/api/*` y la misma página. Variables de entorno:
+  - `DATABASE_URL`: *Internal Database URL* de la base Postgres (tablas `r30k_files` y `r30k_config`, se crean solas).
+  - `UPLOAD_PASSWORD`: contraseña para subir/quitar.
+  - `ALLOWED_ORIGINS` (opcional): orígenes permitidos; por defecto el sitio estático.
 
 ## Alertas
 - **< a 30K**: promedio mensual del año de referencia bajo el umbral (configurable).
